@@ -1,0 +1,27 @@
+{
+  "name": "market-map-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "lint": "node scripts/check-market-map-boundaries.mjs",
+    "typecheck": "node scripts/typecheck-market-map.mjs",
+    "context:check": "node scripts/check-company-context.mjs",
+    "audit:earnings": "node scripts/audit-earnings-commentary.mjs",
+    "audit:earnings:local": "node scripts/audit-earnings-local.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "esbuild": "^0.21.5",
+    "vite": "^5.4.2"
+  }
+}
