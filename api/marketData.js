@@ -3,9 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 const CACHE_TTL_MS = 15 * 60 * 1000
 const CHART_CACHE_TTL_MS = 5 * 60 * 1000
 const FUNDAMENTALS_CACHE_TTL_MS = 30 * 60 * 1000
-// Historical anchors change only once per trading day. Keep them separate from
+// Watchlist history changes only once per trading day. Keep it separate from
 // the short-lived quote cache so refreshes do not repeatedly download history.
-const HISTORY_CACHE_TTL_MS = 6 * 60 * 60 * 1000
+const WATCHLIST_HISTORY_CACHE_TTL_MS = 6 * 60 * 60 * 1000
 const EXTERNAL_MAX_CONCURRENCY = 2
 const EXTERNAL_REQUEST_GAP_MS = 300
 const EXTERNAL_MAX_RETRIES = 2
@@ -157,7 +157,6 @@ async function fetchYahooPriceFresh(ticker) {
   return {
     ticker: meta.symbol ?? ticker,
     price: meta.regularMarketPrice,
-    previousClose: meta.previousClose ?? meta.chartPreviousClose ?? null,
     currency: meta.currency ?? 'N/A',
     fetched_at: new Date().toISOString(),
   }
@@ -194,7 +193,7 @@ export async function fetchYahooAdjustedDaily(ticker, range = '2y') {
         volume: volume[index] ?? null,
       })).filter((point) => Number.isFinite(point.adjustedClose)),
     }
-  }, HISTORY_CACHE_TTL_MS)
+  }, WATCHLIST_HISTORY_CACHE_TTL_MS)
 }
 
 async function fetchYahooChartFresh(ticker, range = '1y') {
@@ -784,6 +783,78 @@ export async function getPrice(supabase, ticker) {
   }
 }
 
+export async function fetchAndStoreHistory(supabase, ticker) {
+  const todayStart = new Date()
+  todayStart.setUTCHours(0, 0, 0, 0)
+
+  const { count } = await supabase
+    .from('price_history')
+    .select('*', { count: 'exact', head: true })
+    .eq('ticker', ticker)
+    .gte('fetched_at', todayStart.toISOString())
+
+  if (count > 0) return
+
+  const url =
+    `https://query1.finance.yahoo.com/v8/finance/chart/` +
+    `${encodeURIComponent(ticker)}?interval=1d&range=2y`
+
+  const res = await limitedFetch(url, { headers: yahooHeaders })
+  if (!res.ok) throw new Error(`Yahoo history HTTP ${res.status} for ${ticker}`)
+
+  const json = await res.json()
+  const result = json?.chart?.result?.[0]
+  if (!result) throw new Error(`No chart result for ${ticker}`)
+
+  const timestamps = result.timestamp ?? []
+  const rawcloses = result.indicators?.quote?.[0]?.close ?? []
+  const adjcloses = result.indicators?.adjclose?.[0]?.adjclose ?? []
+  const now = new Date().toISOString()
+
+  const rows = timestamps
+    .map((ts, i) => ({
+      ticker,
+      date: new Date(ts * 1000).toISOString().slice(0, 10),
+      close: rawcloses[i],
+      adjusted_close: adjcloses[i],
+      fetched_at: now,
+    }))
+    .filter(
+      (row) =>
+        row.close != null &&
+        Number.isFinite(row.close) &&
+        row.adjusted_close != null &&
+        Number.isFinite(row.adjusted_close),
+    )
+
+  if (rows.length > 0) {
+    await supabase.from('price_history').upsert(rows, {
+      onConflict: 'ticker,date',
+    })
+  }
+}
+
+function toLocalDateStr(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-')
+}
+
+async function getPriceAtDate(supabase, ticker, targetStr) {
+  const { data } = await supabase
+    .from('price_history')
+    .select('date, close')
+    .eq('ticker', ticker)
+    .lte('date', targetStr)
+    .order('date', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  return { price: data?.close ?? null, date: data?.date ?? null }
+}
+
 export const YAHOO_PERFORMANCE_RANGES = {
   d1: '1d',
   m1: '1mo',
@@ -878,4 +949,179 @@ export async function getAnchorPrices(_supabase, ticker) {
     throw new Error(`No Yahoo performance ranges available for ${ticker}`)
   }
   return buildYahooPerformanceSnapshot(ticker, charts)
+}
+
+// ── Watchlist market data ──────────────────────────────────────────────────
+
+function localDateKey(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-')
+}
+
+function safeReferenceDate(value, fallback) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ''))) return fallback
+  const parsed = new Date(`${value}T12:00:00`)
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed
+}
+
+function priceOnOrBefore(points, targetDate) {
+  const target = localDateKey(targetDate)
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    if (points[index].date <= target) return points[index]
+  }
+  return null
+}
+
+function percentChange(current, reference) {
+  if (current == null || reference == null || reference === 0) return null
+  return ((current / reference) - 1) * 100
+}
+
+function watchlistTargets(referenceDate) {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = today.getMonth()
+  const day = today.getDate()
+  const selectedReference = safeReferenceDate(referenceDate, new Date(year, 0, 1))
+  return {
+    week: new Date(year, month, day - 7),
+    month: new Date(year, month - 1, day),
+    month3: new Date(year, month - 3, day),
+    month6: new Date(year, month - 6, day),
+    ytd: new Date(year - 1, 11, 31),
+    year: new Date(year - 1, month, day),
+    month18: new Date(year, month - 18, day),
+    year2: new Date(year, month - 24, day),
+    custom: selectedReference,
+  }
+}
+
+async function fetchYahooWatchlistHistory(ticker, includeFullHistory = true) {
+  return dedupe(
+    `watchlist-history:${ticker}:${includeFullHistory ? 'full' : 'recent'}`,
+    () => fetchYahooWatchlistHistoryFresh(ticker, includeFullHistory),
+    WATCHLIST_HISTORY_CACHE_TTL_MS,
+  )
+}
+
+async function fetchYahooWatchlistHistoryFresh(ticker, includeFullHistory = true) {
+  const baseUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}`
+  const now = Math.floor(Date.now() / 1000)
+  // Yahoo returns monthly bars for range=max even if interval=1d is requested.
+  // Keep the two uses distinct: 5y daily data for every reference/performance
+  // calculation, and a full daily series solely for all-time range extrema.
+  const recentResponse = await limitedFetch(`${baseUrl}?range=5y&interval=1d&events=history`, { headers: yahooHeaders })
+  if (!recentResponse.ok) throw new Error(`Yahoo watchlist history HTTP ${recentResponse.status} for ${ticker}`)
+  const recentJson = await recentResponse.json()
+  const recent = recentJson?.chart?.result?.[0]
+  if (!recent) throw new Error(`No watchlist history available for ${ticker}`)
+
+  const normalizePoints = (result) => {
+    const timestamps = result.timestamp ?? []
+    const rawCloses = result.indicators?.quote?.[0]?.close ?? []
+    const adjustedCloses = result.indicators?.adjclose?.[0]?.adjclose ?? []
+    return timestamps
+    .map((timestamp, index) => ({
+      date: new Date(timestamp * 1000).toISOString().slice(0, 10),
+      close: rawCloses[index],
+      adjustedClose: adjustedCloses[index] ?? rawCloses[index],
+    }))
+    .filter((point) =>
+      point.close != null &&
+      Number.isFinite(point.close) &&
+      point.adjustedClose != null &&
+      Number.isFinite(point.adjustedClose),
+    )
+  }
+
+  const snapshot = {
+    ticker,
+    previousClose: recent.meta?.chartPreviousClose ?? null,
+    points: normalizePoints(recent),
+  }
+  if (!includeFullHistory) return snapshot
+
+  const fullResponse = await limitedFetch(
+    `${baseUrl}?period1=0&period2=${now}&interval=1d&events=history`,
+    { headers: yahooHeaders },
+  )
+  if (!fullResponse.ok) throw new Error(`Yahoo full history HTTP ${fullResponse.status} for ${ticker}`)
+  const fullJson = await fullResponse.json()
+  const full = fullJson?.chart?.result?.[0]
+  if (!full) throw new Error(`No full watchlist history available for ${ticker}`)
+  return { ...snapshot, allTimePoints: normalizePoints(full) }
+}
+
+export function buildWatchlistSnapshot(ticker, quote, history, referenceDate) {
+  const price = quote?.price ?? null
+  const points = history?.points ?? []
+  const targets = watchlistTargets(referenceDate)
+  // The penultimate daily bar is the actual prior close. Keep this exact value
+  // as the 1D reference so the displayed anchor and 1D performance agree.
+  const dailyPoint = points.at(-2) ?? null
+  const dailyBase = dailyPoint?.close ?? history?.previousClose ?? null
+  const references = Object.fromEntries(
+    Object.entries(targets).map(([key, target]) => {
+      const point = priceOnOrBefore(points, target)
+      return [key, point ? { price: point.adjustedClose, date: point.date } : null]
+    }),
+  )
+  references.day = dailyBase == null ? null : { price: dailyBase, date: dailyPoint?.date ?? null }
+  const lastYearStart = new Date()
+  lastYearStart.setFullYear(lastYearStart.getFullYear() - 1)
+  const trailingYear = points.filter((point) => point.date >= localDateKey(lastYearStart))
+  const adjustedValues = history?.allTimePoints?.map((point) => point.adjustedClose) ?? []
+  const high52 = trailingYear.length ? Math.max(...trailingYear.map((point) => point.adjustedClose)) : null
+  const low52 = trailingYear.length ? Math.min(...trailingYear.map((point) => point.adjustedClose)) : null
+  const allTimeHigh = adjustedValues.length ? Math.max(...adjustedValues) : null
+  return {
+    ticker,
+    price,
+    currency: quote?.currency ?? null,
+    fetchedAt: quote?.fetchedAt ?? null,
+    dailyChange: price != null && dailyBase != null ? price - dailyBase : null,
+    dailyPercent: percentChange(price, dailyBase),
+    references,
+    ranges: {
+      high52,
+      low52,
+      allTimeHigh,
+      belowHigh52: percentChange(price, high52),
+      aboveLow52: percentChange(price, low52),
+      belowAllTimeHigh: percentChange(price, allTimeHigh),
+    },
+    performance: {
+      day: percentChange(price, dailyBase),
+      week: percentChange(price, references.week?.price),
+      month: percentChange(price, references.month?.price),
+      month3: percentChange(price, references.month3?.price),
+      month6: percentChange(price, references.month6?.price),
+      ytd: percentChange(price, references.ytd?.price),
+      year: percentChange(price, references.year?.price),
+      month18: percentChange(price, references.month18?.price),
+      year2: percentChange(price, references.year2?.price),
+      custom: percentChange(price, references.custom?.price),
+    },
+  }
+}
+
+export async function getWatchlistMarketRows(supabase, tickers, referenceDate, includeFullHistory = true) {
+  const results = await Promise.allSettled(
+    tickers.map(async (ticker) => {
+      const [quote, history] = await Promise.all([
+        getPrice(supabase, ticker),
+        fetchYahooWatchlistHistory(ticker, includeFullHistory),
+      ])
+      return buildWatchlistSnapshot(ticker, quote, history, referenceDate)
+    }),
+  )
+
+  return results.map((result, index) =>
+    result.status === 'fulfilled'
+      ? result.value
+      : { ticker: tickers[index], error: result.reason?.message ?? 'Market data unavailable' },
+  )
 }

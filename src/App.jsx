@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { AI_INFRASTRUCTURE_VERTICALS, MARKET_MAPS, SOFTWARE_VERTICALS } from './data.js'
 import CompanyChatCard from './components/CompanyChatCard.jsx'
+import WatchlistPage from './components/WatchlistPage.jsx'
+import ValuationAnalysisPage from './components/ValuationAnalysisPage.jsx'
 import { getCompanyChatConfig } from './companyChatConfig.js'
 
 // ─── STATIC DATA (homepage themes) ───────────────────────────────────────────
@@ -87,6 +89,8 @@ const getStateFromURL = () => {
   const theme = p.get('theme')
   const layer = p.get('layer')
   const ticker = p.get('ticker')
+  if (p.get('view') === 'watchlist') return { view: 'watchlist' }
+  if (p.get('view') === 'valuation') return { view: 'valuation' }
   const marketMap = MARKET_MAPS[theme]
   if (marketMap && layer !== null && ticker) {
     const idx = parseInt(layer, 10) - 1
@@ -564,7 +568,9 @@ function NavBar({ onNavigate }) {
   return (
     <nav className="nav-bar">
       <span className="nav-logo">Market Maps</span>
-<span className="nav-badge">Alpha Build · v0.1</span>
+      <button type="button" className="nav-watchlist-btn" onClick={() => onNavigate('watchlist')}>Watchlist</button>
+      <button type="button" className="nav-watchlist-btn" onClick={() => onNavigate('valuation')}>Valuation Analysis</button>
+      <span className="nav-badge">Alpha Build · v0.1</span>
     </nav>
   )
 }
@@ -631,7 +637,13 @@ function HomePage({ onNavigate }) {
 
       <div className="section-header">
         <span className="section-label">Select a Theme</span>
-</div>
+        <button type="button" className="section-action-btn" onClick={() => onNavigate('watchlist')}>
+          Open Watchlist
+        </button>
+        <button type="button" className="section-action-btn" onClick={() => onNavigate('valuation')}>
+          Open Valuation Analysis
+        </button>
+      </div>
 
       <div className="cards-grid">
         {THEMES.map((theme) => (
@@ -2077,6 +2089,12 @@ export default function App() {
       const layerIdx = match?.layerIdx ?? 0
       url = `?theme=${encodeURIComponent(payload.themeId)}&layer=${layerIdx + 1}&ticker=${encodeURIComponent(payload.ticker)}`
       state = { view: 'ticker', themeId: payload.themeId, ticker: payload.ticker }
+    } else if (dest === 'watchlist') {
+      url = '?view=watchlist'
+      state = { view: 'watchlist' }
+    } else if (dest === 'valuation') {
+      url = '?view=valuation'
+      state = { view: 'valuation' }
     } else {
       url = `?theme=${dest}`
       state = { view: dest }
@@ -2105,5 +2123,7 @@ export default function App() {
     return <LayerDetailPage themeId={page.themeId} layerIdx={page.layerIdx} onNavigate={navigate} />
   }
   if (page.view === 'map') return <MarketMapPage themeId={page.themeId} onNavigate={navigate} />
+  if (page.view === 'watchlist') return <WatchlistPage onBack={() => navigate('home')} />
+  if (page.view === 'valuation') return <ValuationAnalysisPage onBack={() => navigate('home')} />
   return <HomePage onNavigate={navigate} />
 }

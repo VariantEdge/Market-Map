@@ -9,7 +9,9 @@ import {
   fetchYahooPrice,
   getAnchorPrices,
   getPrice,
+  getWatchlistMarketRows,
 } from './api/marketData.js'
+import { getValuationRows } from './api/valuationData.js'
 
 function marketMapApiPlugin(supabaseUrl, supabaseKey) {
   const supabase = createClient(supabaseUrl, supabaseKey)
@@ -42,6 +44,38 @@ function marketMapApiPlugin(supabaseUrl, supabaseKey) {
           try {
             const price = await fetchYahooPrice(ticker)
             res.end(JSON.stringify(await fetchYahooFundamentals(ticker, price.currency)))
+          } catch (error) {
+            writeError(res, 500, error.message)
+          }
+          return
+        }
+
+        if (req.url.startsWith('/api/watchlist')) {
+          res.setHeader('Content-Type', 'application/json')
+          const url = new URL(req.url, 'http://localhost')
+          const tickers = parseTickers(url.searchParams.get('tickers'))
+          if (!tickers.length) return writeError(res, 400, 'Missing ?tickers= parameter')
+          try {
+            const rows = await getWatchlistMarketRows(
+              supabase,
+              tickers,
+              url.searchParams.get('referenceDate'),
+              url.searchParams.get('fullHistory') === '1',
+            )
+            res.end(JSON.stringify({ rows }))
+          } catch (error) {
+            writeError(res, 500, error.message)
+          }
+          return
+        }
+
+        if (req.url.startsWith('/api/valuation')) {
+          res.setHeader('Content-Type', 'application/json')
+          const url = new URL(req.url, 'http://localhost')
+          const tickers = parseTickers(url.searchParams.get('tickers'))
+          if (!tickers.length) return writeError(res, 400, 'Missing ?tickers= parameter')
+          try {
+            res.end(JSON.stringify(await getValuationRows(supabase, tickers)))
           } catch (error) {
             writeError(res, 500, error.message)
           }

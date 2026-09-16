@@ -12,10 +12,13 @@
     "context:check": "node scripts/check-company-context.mjs",
     "audit:earnings": "node scripts/audit-earnings-commentary.mjs",
     "audit:earnings:local": "node scripts/audit-earnings-local.mjs",
+    "financials:audit": "node --test tests/adjusted-ebitda-golden.test.mjs tests/adjusted-ebitda-invariants.test.mjs tests/adjusted-ebitda-sec-ground-truth.test.mjs && node scripts/financials-audit.mjs --all",
+    "financials:golden-compare": "node scripts/compare-adjusted-ebitda-ground-truth.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
+    "cheerio": "^1.1.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

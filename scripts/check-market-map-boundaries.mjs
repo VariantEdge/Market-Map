@@ -6,9 +6,10 @@ const SOURCE_DIRS = ['api', 'server', 'src']
 const TEXT_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.css'])
 const forbidden = [
   /(?:^|[\\/])podcast(?:[\\/]|$)/i,
-  /(?:^|[\\/])valuation(?:[\\/]|$)/i,
   /(?:^|[\\/])tracefolio(?:[\\/]|$)/i,
-  /(?:^|[\\/])watchlist(?:[\\/]|$)/i,
+  /(?:^|[\\/])youtube(?:[\\/]|$)/i,
+  /(?:^|[\\/])x-ticker-monitor(?:[\\/]|$)/i,
+  /XTickerMonitor/i,
   /(?:^|[\\/])reelrelay(?:[\\/]|$)/i,
   /Website App/i,
   /SUPABASE_SERVICE_ROLE_KEY/,
@@ -39,4 +40,4 @@ for (const directory of SOURCE_DIRS) {
 }
 
 if (failed) process.exit(1)
-console.log('Market Map boundary check passed.')
+console.log('Market Map, Watchlist, and Valuation boundary check passed.')

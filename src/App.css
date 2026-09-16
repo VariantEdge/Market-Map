@@ -176,6 +176,27 @@ body::before {
   color: var(--text-dim);
 }
 
+.nav-watchlist-btn {
+  margin-left: auto;
+  margin-right: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 9px;
+  background: rgba(56, 189, 248, 0.07);
+  color: var(--text-mid);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nav-watchlist-btn:hover {
+  border-color: var(--border-h);
+  color: #e0f2fe;
+}
+
 .section-action-btn {
   border: 1px solid var(--border-h);
   border-radius: 6px;
