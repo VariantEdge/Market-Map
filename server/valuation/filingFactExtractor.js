@@ -239,7 +239,7 @@ function periodFromHeaders(headers, company, filing, context = '') {
     const duration = /three months ended/i.test(combinedPlain) ? { type: 'QUARTER', months: 3 }
       : /six months ended/i.test(combinedPlain) ? { type: 'YTD_6M', months: 6 }
         : /nine months ended/i.test(combinedPlain) ? { type: 'YTD_9M', months: 9 }
-          : /ltm ended/i.test(combinedPlain) ? { type: 'LTM', months: 12 }
+          : /(?:\bltm|trailing twelve months) ended/i.test(combinedPlain) ? { type: 'LTM', months: 12 }
             : /(?:twelve months|year) ended/i.test(combinedPlain) ? { type: 'FISCAL_YEAR', months: 12 }
               : null
     if (duration) {
@@ -272,7 +272,8 @@ function periodFromHeaders(headers, company, filing, context = '') {
   const contextualDuration = /three months ended/i.test(context) ? { type: 'QUARTER', months: 3 }
     : /six months ended/i.test(context) ? { type: 'YTD_6M', months: 6 }
       : /nine months ended/i.test(context) ? { type: 'YTD_9M', months: 9 }
-        : /(?:twelve months|year) ended/i.test(context) ? { type: 'FISCAL_YEAR', months: 12 }
+        : /(?:\bltm|trailing twelve months) ended/i.test(context) ? { type: 'LTM', months: 12 }
+          : /(?:twelve months|year) ended/i.test(context) ? { type: 'FISCAL_YEAR', months: 12 }
           : null
   if (contextualDuration) {
     const contextualEnd = contextualPeriodEnd(context, year)

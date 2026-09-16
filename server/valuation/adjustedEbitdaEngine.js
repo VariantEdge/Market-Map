@@ -125,8 +125,9 @@ function selectAuthoritativeFacts(rawLedger) {
   return { selected, rejected }
 }
 
-function component(fact) {
+function component(fact, inputRole = null) {
   return {
+    inputRole,
     sourceStart: fact.startDate,
     sourceEnd: fact.endDate,
     sourcePeriodType: fact.periodType,
@@ -154,10 +155,37 @@ function component(fact) {
     reportedScale: fact.reportedScale,
     reportedUnits: fact.reportedUnits,
     normalizedValue: Number(fact.value),
+    currency: fact.currency,
     definitionFingerprint: fact.definitionFingerprint,
     adjustedEbitdaMethod: ADJUSTED_EBITDA_METHOD.COMPANY_REPORTED,
     selectionDecision: fact.selectionDecision,
   }
+}
+
+function directLtmEntry(fact) {
+  const sourceComponent = component(fact, 'DIRECT_REPORTED_LTM')
+  return withDenominatorIdentity({
+    value: Number(fact.value),
+    components: [sourceComponent],
+    sourceType: 'SEC-filed company non-GAAP reconciliation',
+    provider: 'SEC',
+    confidence: 'High',
+    definition: 'Company-defined Adjusted EBITDA',
+    exactness: 'REPORTED',
+    validationStatus: HISTORICAL_VALIDATION_STATUS.VERIFIED_REPORTED,
+    method: ADJUSTED_EBITDA_METHOD.COMPANY_REPORTED,
+    adjustedEbitdaMethod: ADJUSTED_EBITDA_METHOD.COMPANY_REPORTED,
+    definitionFingerprint: fact.definitionFingerprint,
+    compatibleDefinitionFingerprints: [fact.definitionFingerprint],
+    sourceUrl: fact.filingUrl,
+    documentHash: fact.provenance.sourceHash,
+    retrievedAt: fact.provenance.retrievedAt,
+    requestedPeriodType: ADJUSTED_EBITDA_PERIOD.LTM,
+    sourcePeriodType: ADJUSTED_EBITDA_PERIOD.LTM,
+    derivation: 'DIRECT_REPORTED_LTM',
+    verificationBasis: 'STRUCTURAL_SEC_TABLE_CELL_PROVENANCE',
+    warnings: [],
+  })
 }
 
 function identityPayload(entry) {
@@ -335,7 +363,82 @@ function derivedCalendarYearEntry(year, facts) {
   })
 }
 
-function ltmEntry(facts) {
+function shiftedYearMatches(left, right) {
+  const leftStart = new Date(`${left.startDate}T12:00:00Z`)
+  const leftEnd = new Date(`${left.endDate}T12:00:00Z`)
+  const rightStart = new Date(`${right.startDate}T12:00:00Z`)
+  const rightEnd = new Date(`${right.endDate}T12:00:00Z`)
+  return leftStart.getUTCFullYear() === rightStart.getUTCFullYear() + 1 &&
+    leftEnd.getUTCFullYear() === rightEnd.getUTCFullYear() + 1 &&
+    leftStart.getUTCMonth() === rightStart.getUTCMonth() &&
+    leftStart.getUTCDate() === rightStart.getUTCDate() &&
+    leftEnd.getUTCMonth() === rightEnd.getUTCMonth() &&
+    leftEnd.getUTCDate() === rightEnd.getUTCDate() &&
+    Math.abs(daysInclusive(left.startDate, left.endDate) - daysInclusive(right.startDate, right.endDate)) <= 1
+}
+
+function immediatelyPrecedes(left, right) {
+  return dateMs(right.startDate) - dateMs(left.endDate) === DAY_MS
+}
+
+function ltmBridgeEntry(facts) {
+  const ytdFacts = facts.filter((fact) =>
+    fact.periodType === ADJUSTED_EBITDA_PERIOD.YTD_6M ||
+    fact.periodType === ADJUSTED_EBITDA_PERIOD.YTD_9M)
+    .sort((left, right) => right.endDate.localeCompare(left.endDate))
+
+  for (const currentYtd of ytdFacts) {
+    const priorYtd = ytdFacts.find((candidate) =>
+      candidate !== currentYtd &&
+      candidate.periodType === currentYtd.periodType &&
+      shiftedYearMatches(currentYtd, candidate))
+    if (!priorYtd) continue
+
+    const fullYear = facts.find((candidate) =>
+      [ADJUSTED_EBITDA_PERIOD.FISCAL_YEAR, ADJUSTED_EBITDA_PERIOD.CALENDAR_YEAR].includes(candidate.periodType) &&
+      candidate.startDate === priorYtd.startDate &&
+      immediatelyPrecedes(candidate, currentYtd))
+    if (!fullYear) continue
+
+    const bridgeFacts = [fullYear, currentYtd, priorYtd]
+    if (!definitionsCompatible(bridgeFacts)) {
+      return unavailable('DEFINITION_INCOMPATIBLE', bridgeFacts.map(component))
+    }
+    if (new Set(bridgeFacts.map((fact) => fact.currency)).size !== 1) {
+      return unavailable('CURRENCY_INCOMPATIBLE', bridgeFacts.map(component))
+    }
+    const components = [
+      component(fullYear, 'LATEST_VERIFIED_FULL_YEAR'),
+      component(currentYtd, 'CURRENT_YTD'),
+      component(priorYtd, 'PRIOR_YEAR_COMPARABLE_YTD'),
+    ]
+    return withDenominatorIdentity({
+      value: Number(fullYear.value) + Number(currentYtd.value) - Number(priorYtd.value),
+      components,
+      sourceType: 'Derived from validated SEC-filed company-defined full-year and comparable YTD periods',
+      provider: 'SEC',
+      confidence: 'High',
+      definition: 'Company-defined Adjusted EBITDA',
+      exactness: 'DERIVED',
+      validationStatus: HISTORICAL_VALIDATION_STATUS.VERIFIED_DERIVED,
+      method: ADJUSTED_EBITDA_METHOD.COMPANY_DEFINED_DERIVED,
+      adjustedEbitdaMethod: ADJUSTED_EBITDA_METHOD.COMPANY_DEFINED_DERIVED,
+      definitionFingerprint: combinedDefinitionFingerprint(bridgeFacts),
+      compatibleDefinitionFingerprints: [...new Set(bridgeFacts.map((fact) => fact.definitionFingerprint))],
+      sourceUrl: currentYtd.filingUrl,
+      documentHash: currentYtd.provenance.sourceHash,
+      retrievedAt: currentYtd.provenance.retrievedAt,
+      requestedPeriodType: ADJUSTED_EBITDA_PERIOD.LTM,
+      sourcePeriodType: currentYtd.periodType,
+      derivation: 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD',
+      verificationBasis: 'STRUCTURAL_SEC_TABLE_CELL_PROVENANCE',
+      warnings: [],
+    })
+  }
+  return null
+}
+
+function fourQuarterLtmEntry(facts) {
   const quarters = facts.filter((fact) => fact.periodType === ADJUSTED_EBITDA_PERIOD.QUARTER)
     .sort((left, right) => left.endDate.localeCompare(right.endDate))
     .slice(-4)
@@ -371,6 +474,19 @@ function ltmEntry(facts) {
     verificationBasis: 'STRUCTURAL_SEC_TABLE_CELL_PROVENANCE',
     warnings: [],
   })
+}
+
+function ltmEntry(facts) {
+  const direct = facts.filter((fact) => fact.periodType === ADJUSTED_EBITDA_PERIOD.LTM)
+    .sort((left, right) => right.endDate.localeCompare(left.endDate))[0]
+  if (direct) return directLtmEntry(direct)
+
+  const fourQuarter = fourQuarterLtmEntry(facts)
+  if (fourQuarter.value != null) return fourQuarter
+
+  const bridge = ltmBridgeEntry(facts)
+  if (bridge) return bridge
+  return fourQuarter
 }
 
 export function buildCanonicalAdjustedEbitda({ company, rawLedger, years }) {
@@ -426,12 +542,38 @@ export function assertCanonicalAdjustedEbitdaEntry(entry, requestedPeriodType) {
       throw new Error('Derived calendar-year Adjusted EBITDA must use four exact calendar quarters.')
     }
   }
-  if (requestedPeriodType === ADJUSTED_EBITDA_PERIOD.LTM &&
-      (entry.adjustedEbitdaMethod !== ADJUSTED_EBITDA_METHOD.COMPANY_DEFINED_DERIVED ||
-       entry.derivation !== 'SUM_OF_LATEST_FOUR_COMPATIBLE_STANDALONE_QUARTERS' ||
-       entry.components.length !== 4 ||
-       entry.components.some((item) => item.sourcePeriodType !== ADJUSTED_EBITDA_PERIOD.QUARTER))) {
-    throw new Error('LTM Adjusted EBITDA must use exactly four standalone quarters.')
+  if (requestedPeriodType === ADJUSTED_EBITDA_PERIOD.LTM) {
+    const directReported = entry.adjustedEbitdaMethod === ADJUSTED_EBITDA_METHOD.COMPANY_REPORTED &&
+      entry.derivation === 'DIRECT_REPORTED_LTM' && entry.components.length === 1 &&
+      entry.components[0].sourcePeriodType === ADJUSTED_EBITDA_PERIOD.LTM
+    const fourQuarters = entry.adjustedEbitdaMethod === ADJUSTED_EBITDA_METHOD.COMPANY_DEFINED_DERIVED &&
+      entry.derivation === 'SUM_OF_LATEST_FOUR_COMPATIBLE_STANDALONE_QUARTERS' &&
+      entry.components.length === 4 &&
+      entry.components.every((item) => item.sourcePeriodType === ADJUSTED_EBITDA_PERIOD.QUARTER)
+    const bridge = entry.adjustedEbitdaMethod === ADJUSTED_EBITDA_METHOD.COMPANY_DEFINED_DERIVED &&
+      entry.derivation === 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD' && entry.components.length === 3
+    if (!directReported && !fourQuarters && !bridge) {
+      throw new Error('LTM Adjusted EBITDA uses an unsupported construction method.')
+    }
+    if (bridge) {
+      const [fullYear, currentYtd, priorYtd] = entry.components
+      const ytdTypes = new Set([ADJUSTED_EBITDA_PERIOD.YTD_6M, ADJUSTED_EBITDA_PERIOD.YTD_9M])
+      const boundariesValid =
+        [ADJUSTED_EBITDA_PERIOD.FISCAL_YEAR, ADJUSTED_EBITDA_PERIOD.CALENDAR_YEAR].includes(fullYear.sourcePeriodType) &&
+        ytdTypes.has(currentYtd.sourcePeriodType) &&
+        currentYtd.sourcePeriodType === priorYtd.sourcePeriodType &&
+        fullYear.sourceStart === priorYtd.sourceStart &&
+        dateMs(currentYtd.sourceStart) - dateMs(fullYear.sourceEnd) === DAY_MS &&
+        shiftedYearMatches(
+          { startDate: currentYtd.sourceStart, endDate: currentYtd.sourceEnd },
+          { startDate: priorYtd.sourceStart, endDate: priorYtd.sourceEnd },
+        )
+      const currencies = new Set(entry.components.map((item) => item.currency))
+      const expectedValue = Number(fullYear.normalizedValue) + Number(currentYtd.normalizedValue) - Number(priorYtd.normalizedValue)
+      if (!boundariesValid || currencies.size !== 1 || ![...currencies][0] || Number(entry.value) !== expectedValue) {
+        throw new Error('LTM Adjusted EBITDA bridge has invalid periods, currency, or arithmetic.')
+      }
+    }
   }
   const expectedIdentity = adjustedEbitdaDenominatorIdentity(entry)
   if (!entry.denominatorIdentity || entry.denominatorIdentity !== expectedIdentity) {
