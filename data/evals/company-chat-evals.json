@@ -1,0 +1,109 @@
+[
+  {
+    "id": "cohr-chokepoint",
+    "ticker": "COHR",
+    "theme": "photonics",
+    "layer": 1,
+    "question": "What chokepoint does COHR sit on?",
+    "must_include": [
+      { "concept": "indium phosphide", "any_of": ["indium phosphide", "inp"] },
+      { "concept": "capacity conversion constraints", "any_of": ["capacity", "yield", "qualification", "assembly"] }
+    ],
+    "must_not_include": [
+      { "concept": "unsupported named customer", "phrases": ["according to a named customer", "customer is nvidia"] }
+    ],
+    "relevant_headings": ["Chokepoint", "Products / exposure"],
+    "expected_confidence_if_context_is_thin": "Low"
+  },
+  {
+    "id": "cohr-bull-bear",
+    "ticker": "COHR",
+    "theme": "photonics",
+    "layer": 1,
+    "question": "Bull and bear case for COHR",
+    "must_include": [
+      { "concept": "AI data-center optical demand", "any_of": ["ai-data-center", "ai data center", "optical demand"] },
+      { "concept": "execution or qualification risk", "any_of": ["qualification", "execution", "shipment", "yield"] }
+    ],
+    "must_not_include": [
+      { "concept": "unsupported precise market share", "phrases": ["market share is", "controls the market"] }
+    ],
+    "relevant_headings": ["Bull case", "Bear case"],
+    "expected_confidence_if_context_is_thin": "Low"
+  },
+  {
+    "id": "cohr-break-bull-case",
+    "ticker": "COHR",
+    "theme": "photonics",
+    "layer": 1,
+    "question": "What would break the bull case on COHR?",
+    "must_include": [
+      { "concept": "qualification or shipment conversion", "any_of": ["qualification", "shipment", "recognized revenue"] },
+      { "concept": "capacity, yield, mix, or adoption risk", "any_of": ["capacity", "yield", "product mix", "adoption", "demand visibility"] }
+    ],
+    "must_not_include": [
+      { "concept": "unsupported financial target", "phrases": ["price target", "revenue target", "eps target"] }
+    ],
+    "answer_quality": {
+      "min_words": 150,
+      "reject_generic_bullet_list": true,
+      "reject_raw_context_ids": true,
+      "reject_direct_answer_start": true,
+      "reject_market_maps_evidence_heading": true,
+      "require_first_order": true,
+      "require_second_order": true,
+      "require_financial_transmission": true,
+      "require_web_source_cards_when_available": true
+    },
+    "relevant_headings": ["What would break the thesis", "Bear case", "Key debates"],
+    "expected_confidence_if_context_is_thin": "Low"
+  },
+  {
+    "id": "cohr-alternatives",
+    "ticker": "COHR",
+    "theme": "photonics",
+    "layer": 1,
+    "question": "Who are the alternatives?",
+    "must_include": [
+      { "concept": "product-level comparison", "any_of": ["product level", "specific product", "product scope"] },
+      { "concept": "layer peers are not automatically competitors", "any_of": ["not automatically", "not direct", "does not establish direct competition"] }
+    ],
+    "must_not_include": [
+      { "concept": "unsupported direct competitor claim", "phrases": ["the direct competitor is", "the primary competitor is"] }
+    ],
+    "relevant_headings": ["Alternatives / competitors", "Market map layer"],
+    "expected_confidence_if_context_is_thin": "Low"
+  },
+  {
+    "id": "cohr-evidence",
+    "ticker": "COHR",
+    "theme": "photonics",
+    "layer": 1,
+    "question": "What evidence supports the answer?",
+    "must_include": [
+      { "concept": "capacity-to-revenue conversion", "any_of": ["qualified output", "shipment", "recognized revenue", "capacity"] },
+      { "concept": "grounded context qualification", "any_of": ["context", "evidence", "market maps"] }
+    ],
+    "must_not_include": [
+      { "concept": "unsupported external attribution", "phrases": ["according to wall street", "according to analysts"] }
+    ],
+    "relevant_headings": ["Chokepoint", "Key debates", "What would break the thesis"],
+    "expected_confidence_if_context_is_thin": "Low"
+  },
+  {
+    "id": "cohr-unknowns",
+    "ticker": "COHR",
+    "theme": "photonics",
+    "layer": 1,
+    "question": "What do you not know from the current context?",
+    "must_include": [
+      { "concept": "unresolved production or qualification timing", "any_of": ["production timing", "qualification", "shipments", "programs"] },
+      { "concept": "limits of current context", "any_of": ["do not know", "don't know", "not enough context", "current context"] }
+    ],
+    "must_not_include": [
+      { "concept": "fabricated certainty", "phrases": ["we know with certainty", "it is guaranteed"] }
+    ],
+    "relevant_headings": ["Key open questions", "Source notes"],
+    "expected_confidence_if_context_is_thin": "Low"
+  }
+]
