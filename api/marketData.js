@@ -879,5 +879,3 @@ export async function getAnchorPrices(_supabase, ticker) {
   }
   return buildYahooPerformanceSnapshot(ticker, charts)
 }
-
-\n
