@@ -1,4 +1,4 @@
-import { fetchYahooChart, fetchYahooFundamentals, getPrice } from './marketData.js'
+import { fetchYahooChart, fetchYahooFundamentals, getPrice, getPrices } from './marketData.js'
 import { getCompanyFacts, resolveCompany } from '../server/sec/edgar.js'
 import {
   calendarizeAnnualEstimateWithReportedQuarters,
@@ -24,16 +24,79 @@ import {
   classifyIssuer,
   isOperatingCompanyClassification,
 } from '../server/valuation/issuerClassification.js'
+import { fetchWiseSheetsCanonicalRows } from '../server/valuation/wiseSheetsCanonicalShadow.js'
+import { buildWiseSheetsHistorical, completeWithSecExceptionQuarters } from '../server/valuation/wiseSheetsFinancials.js'
+import { buildCanonicalHistoricalFinancials } from '../server/valuation/secCanonicalFinancials.js'
+import { createPerTickerCache, runAbortableTask, runBoundedTask } from '../server/valuation/interactiveCache.js'
 import {
-  completeWithSecExceptionQuarters,
-  fetchWiseSheetsQuarterlyFinancials,
-} from '../server/valuation/wiseSheetsFinancials.js'
+  evaluateFinancialSnapshotPromotion,
+  FINANCIAL_SNAPSHOT_STATE,
+  loadFinancialSnapshots,
+  saveFinancialSnapshot,
+  snapshotFinancialRow,
+} from '../server/valuation/financialSnapshot.js'
 
 const VALUATION_CACHE_TTL_MS = 60 * 60 * 1000
+const CANONICAL_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const INTERACTIVE_SOURCE_TIMEOUT_MS = 8_000
 const SEC_SOURCE_TIMEOUT_MS = 30_000
+const CONSENSUS_CACHE_TTL_MS = 30 * 60 * 1000
 const cache = new Map()
 const inFlight = new Map()
+const canonicalHistoryCache = createPerTickerCache({
+  namespace: 'canonical-history',
+  ttlMs: CANONICAL_CACHE_TTL_MS,
+})
+const adjustedEbitdaCache = createPerTickerCache({
+  namespace: 'adjusted-ebitda',
+  ttlMs: CANONICAL_CACHE_TTL_MS,
+  persist: false,
+})
+const wiseSheetsBatchCache = createPerTickerCache({
+  namespace: 'wisesheets-batches',
+  ttlMs: CANONICAL_CACHE_TTL_MS,
+})
+const consensusCache = createPerTickerCache({
+  namespace: 'valuation-consensus',
+  ttlMs: CONSENSUS_CACHE_TTL_MS,
+  persist: false,
+})
+
+export function createWiseSheetsBatchLoader({ cacheStore = wiseSheetsBatchCache, fetchRows = fetchWiseSheetsCanonicalRows } = {}) {
+  return async (inputTickers, { refresh = false, cacheKeySuffix = '' } = {}) => {
+    const tickers = [...new Set(inputTickers.map((ticker) => String(ticker).trim().toUpperCase()).filter(Boolean))].sort()
+    const key = `${tickers.join(',')}${cacheKeySuffix}`
+    const cached = await cacheStore.get(key, async () => runBoundedTask(
+      'WISESHEETS_HISTORY',
+      () => fetchRows(tickers),
+      SEC_SOURCE_TIMEOUT_MS,
+      [],
+    ), { refresh, waitForRefresh: refresh })
+    return { ...cached.value, cache: cached.cache }
+  }
+}
+
+const loadWiseSheetsBatch = createWiseSheetsBatchLoader()
+
+function recordLatency(profile, stage, elapsedMs, details = {}) {
+  if (!profile) return
+  profile.stages ??= {}
+  const entry = profile.stages[stage] ?? { calls: 0, elapsedMs: 0, maxMs: 0 }
+  entry.calls += 1
+  entry.elapsedMs += elapsedMs
+  entry.maxMs = Math.max(entry.maxMs, elapsedMs)
+  Object.assign(entry, details)
+  profile.stages[stage] = entry
+}
+
+async function measureLatency(profile, stage, task, details = {}) {
+  const startedAt = performance.now()
+  try {
+    return await task()
+  } finally {
+    recordLatency(profile, stage, performance.now() - startedAt, details)
+  }
+}
 
 const METRIC_TAGS = {
   revenue: ['RevenueFromContractWithCustomerExcludingAssessedTax', 'SalesRevenueNet', 'Revenues'],
@@ -150,6 +213,7 @@ function deriveMarginBasedForwardMetric(forwardRevenue, ltmMetric, ltmRevenue, m
 
 function quoteRanges(chart, price) {
   const values = chart?.points?.map((point) => Number(point.close)).filter(Number.isFinite) ?? []
+  if (Number.isFinite(Number(price))) values.push(Number(price))
   const high52 = values.length ? Math.max(...values) : null
   const low52 = values.length ? Math.min(...values) : null
   return { high52, low52, belowHigh52: pct(price, high52), aboveLow52: pct(price, low52) }
@@ -162,10 +226,12 @@ function quoteRanges(chart, price) {
 function compactComponents(components = [], limit = 8) {
   const unique = new Map()
   for (const component of components) {
-    const key = [component.sourceStart, component.sourceEnd, component.tag, component.sourceType, component.sourceValue].join(':')
+    const key = [component.sourceProvider ?? component.provider, component.sourceStart, component.sourceEnd,
+      component.tag, component.sourceType, component.sourceValue].join(':')
     if (unique.has(key)) continue
     unique.set(key, {
-      provider: component.provider ?? null,
+      provider: component.provider ?? component.sourceProvider ?? null,
+      sourceProvider: component.sourceProvider ?? component.provider ?? null,
       metric: component.metric ?? null,
       quarterEnd: component.quarterEnd ?? component.sourceEnd ?? null,
       sourceStart: component.sourceStart ?? null,
@@ -174,9 +240,15 @@ function compactComponents(components = [], limit = 8) {
       rawValue: component.rawValue ?? null,
       sourceUrl: component.sourceUrl ?? null,
       tag: component.tag ?? null,
-      filed: component.filed ?? null,
-      accn: component.accn ?? null,
+      filed: component.filed ?? component.filingDate ?? null,
+      filingDate: component.filingDate ?? component.filed ?? null,
+      accn: component.accn ?? component.accession ?? null,
+      accession: component.accession ?? component.accn ?? null,
       sourceType: component.sourceType ?? null,
+      operationScope: component.operationScope ?? null,
+      currency: component.currency ?? null,
+      dateAuthority: component.dateAuthority ?? null,
+      reportedVsDerived: component.reportedVsDerived ?? null,
       formula: component.formula ?? null,
       inputs: (component.inputs ?? []).slice(0, 12),
       sourceId: component.sourceId ?? null,
@@ -203,7 +275,9 @@ function compactComponents(components = [], limit = 8) {
       selectionDecision: component.selectionDecision ?? null,
       overlapDays: component.overlapDays ?? null,
       totalDays: component.totalDays ?? null,
+      allocationPercentage: component.allocationPercentage ?? null,
       contribution: component.contribution ?? null,
+      derivation: component.derivation ?? null,
     })
     if (unique.size === limit) break
   }
@@ -235,6 +309,9 @@ function compactValuationRowForClient(row) {
       ...row.provenance,
       revenue: Object.fromEntries(Object.entries(row.provenance.revenue ?? {}).map(([period, entry]) => [period, compactProvenanceEntry(entry)])),
       grossProfit: Object.fromEntries(Object.entries(row.provenance.grossProfit ?? {}).map(([period, entry]) => [period, compactProvenanceEntry(entry)])),
+      ebit: Object.fromEntries(Object.entries(row.provenance.ebit ?? {}).map(([period, entry]) => [period, compactProvenanceEntry(entry)])),
+      operatingCashFlow: Object.fromEntries(Object.entries(row.provenance.operatingCashFlow ?? {}).map(([period, entry]) => [period, compactProvenanceEntry(entry)])),
+      capitalExpenditures: Object.fromEntries(Object.entries(row.provenance.capitalExpenditures ?? {}).map(([period, entry]) => [period, compactProvenanceEntry(entry)])),
       ebitda: Object.fromEntries(Object.entries(row.provenance.ebitda ?? {}).map(([period, entry]) => [period, compactProvenanceEntry(entry)])),
       freeCashFlow: Object.fromEntries(Object.entries(row.provenance.freeCashFlow ?? {}).map(([period, entry]) => [period, compactProvenanceEntry(entry)])),
     },
@@ -250,42 +327,316 @@ function compactValuationRowForClient(row) {
   }
 }
 
-async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical = null) {
-  const auditedFinancials = await loadAuditedFinancials(ticker, years.actual)
-  const [quote, fundamentals, company, chart] = await Promise.all([
-    settleWithin(getPrice(supabase, ticker), null),
-    settleWithin(fetchYahooFundamentals(ticker), null),
-    settleWithin(resolveCompany(ticker), null, SEC_SOURCE_TIMEOUT_MS),
-    settleWithin(fetchYahooChart(ticker, '1y'), null),
+function dateOnly(value) {
+  return String(value ?? '').slice(0, 10)
+}
+
+export function latestCompletedTradingClose(points = [], now = new Date()) {
+  const today = localDateString(now)
+  return [...points]
+    .filter((point) => Number.isFinite(Number(point.close)) && dateOnly(point.date) < today)
+    .sort((left, right) => dateOnly(right.date).localeCompare(dateOnly(left.date)))[0]?.close ?? null
+}
+
+export function isMarketHistoryFresh(points = [], now = new Date()) {
+  const latest = [...points].map((point) => dateOnly(point.date)).filter(Boolean).sort().at(-1)
+  if (!latest) return false
+  const ageDays = Math.floor((new Date(`${localDateString(now)}T12:00:00`) - new Date(`${latest}T12:00:00`)) / 86_400_000)
+  return ageDays >= 0 && ageDays <= 5
+}
+
+export function buildMarginBasedForwardSeries({ revenue, estimateYears, ntmRevenue, basisMetric, basisRevenue, metricName }) {
+  return {
+    NTM: deriveMarginBasedForwardMetric(ntmRevenue, basisMetric, basisRevenue, metricName, 'NTM'),
+    ...Object.fromEntries(estimateYears.map((year) => {
+      const period = `${year}E`
+      return [period, deriveMarginBasedForwardMetric(revenue[period], basisMetric, basisRevenue, metricName, period)]
+    })),
+  }
+}
+
+export function failClosedForwardBasis(metrics, estimateYears, reason) {
+  for (const metric of metrics) {
+    for (const period of ['NTM', ...estimateYears.map((year) => `${year}E`)]) {
+      metric[period] = {
+        value: null,
+        components: [],
+        sourceType: 'Unavailable',
+        validationStatus: HISTORICAL_VALIDATION_STATUS.MISSING_SOURCE_DATA,
+        method: reason,
+        warnings: [reason],
+      }
+    }
+  }
+}
+
+const VERIFIED_ADJUSTED_EBITDA_STATUSES = new Set([
+  HISTORICAL_VALIDATION_STATUS.VERIFIED_REPORTED,
+  HISTORICAL_VALIDATION_STATUS.VERIFIED_DERIVED,
+])
+
+function isUsableAdjustedEbitda(entry) {
+  return entry?.value != null && Number.isFinite(Number(entry.value)) &&
+    VERIFIED_ADJUSTED_EBITDA_STATUSES.has(entry.validationStatus ?? entry.status)
+}
+
+export function hasCompleteAuditedAdjustedEbitda(auditedFinancials, years) {
+  if (!auditedFinancials) return false
+  return years.every((year) => isUsableAdjustedEbitda(auditedFinancials.actuals?.ebitda?.[year])) &&
+    isUsableAdjustedEbitda(auditedFinancials.ltm?.ebitda)
+}
+
+export async function loadSupplementalProductionTask(input, dependencies = {}, timeoutMs = SEC_SOURCE_TIMEOUT_MS) {
+  if (input.skipSupplemental) return { records: [], errors: [], failure: null }
+  const loadCached = dependencies.loadCached ?? loadLatestSupplementalSourceFacts
+  const loadSupplemental = dependencies.loadSupplemental ?? loadSupplementalFilingFacts
+  const result = await runAbortableTask('SUPPLEMENTAL_SEC_EXTRACTION', async (signal) => {
+    const cached = await loadCached(input.company).catch(() => null)
+    if (cached) return cached
+    return loadSupplemental({
+      company: input.company,
+      filingIndex: input.filingIndex,
+      years: input.years,
+      signal,
+    })
+  }, timeoutMs, { records: [], errors: [] })
+  if (!result.diagnostic) {
+    if (!result.value?.records?.length && result.value?.errors?.length) {
+      return { ...result.value, failure: 'ADJUSTED_EBITDA_EXTRACTION_FAILED' }
+    }
+    return { ...result.value, failure: null }
+  }
+  const failure = result.diagnostic.reason === 'SUPPLEMENTAL_SEC_EXTRACTION_TIMEOUT'
+    ? 'ADJUSTED_EBITDA_EXTRACTION_TIMEOUT'
+    : 'ADJUSTED_EBITDA_EXTRACTION_FAILED'
+  return {
+    records: [],
+    errors: [failure, result.diagnostic.detail].filter(Boolean),
+    failure,
+  }
+}
+
+export async function loadAdjustedEbitdaProductionTask(input, dependencies = {}, timeoutMs = SEC_SOURCE_TIMEOUT_MS) {
+  const loadCached = dependencies.loadCached ?? loadLatestSupplementalSourceFacts
+  const loadSupplemental = dependencies.loadSupplemental ?? loadSupplementalFilingFacts
+  const buildLedger = dependencies.buildLedger ?? buildCanonicalQuarterlyLedger
+  const controller = new AbortController()
+  const task = async () => {
+    const cachedSupplemental = input.preloadedSupplemental !== undefined
+      ? null
+      : input.skipSupplemental
+      ? null
+      : await loadCached(input.company).catch(() => null)
+    const supplemental = input.preloadedSupplemental !== undefined
+      ? await input.preloadedSupplemental
+      : input.skipSupplemental
+      ? { records: [], errors: [] }
+      : cachedSupplemental ?? await loadSupplemental({
+        company: input.company,
+        filingIndex: input.filingIndex,
+        years: input.years,
+        signal: controller.signal,
+      }).catch((error) => ({ records: [], errors: [error?.message ?? 'ADJUSTED_EBITDA_SUPPLEMENTAL_FAILED'] }))
+    if (supplemental?.failure || (!supplemental?.records?.length && supplemental?.errors?.length)) {
+      throw new Error(supplemental.failure ?? 'ADJUSTED_EBITDA_EXTRACTION_FAILED')
+    }
+    controller.signal.throwIfAborted()
+    const ledger = await buildLedger({
+      company: input.company,
+      facts: input.facts,
+      years: input.years,
+      filingIndex: input.filingIndex,
+      supplementalRawFacts: supplemental.records,
+      fallbackStatus: input.fallbackStatus,
+    })
+    return { ledger, supplemental, failure: null }
+  }
+  let timeout
+  return Promise.race([
+    Promise.resolve().then(task)
+      .catch((error) => ({
+        ledger: null,
+        supplemental: { records: [], errors: [error?.message ?? 'ADJUSTED_EBITDA_EXTRACTION_FAILED'] },
+        failure: error?.message ?? 'ADJUSTED_EBITDA_EXTRACTION_FAILED',
+      })),
+    new Promise((resolve) => {
+      timeout = setTimeout(() => {
+        controller.abort(new Error('ADJUSTED_EBITDA_EXTRACTION_TIMEOUT'))
+        resolve({
+          ledger: null,
+          supplemental: { records: [], errors: ['ADJUSTED_EBITDA_EXTRACTION_TIMEOUT'] },
+          failure: 'ADJUSTED_EBITDA_EXTRACTION_TIMEOUT',
+        })
+      }, timeoutMs)
+    }),
+  ]).finally(() => clearTimeout(timeout))
+}
+
+export async function loadLegacyForwardBasisProductionTask(input, dependencies = {}, timeoutMs = SEC_SOURCE_TIMEOUT_MS) {
+  const loadCached = dependencies.loadCached ?? loadLatestSupplementalSourceFacts
+  const loadSupplemental = dependencies.loadSupplemental ?? loadSupplementalFilingFacts
+  const buildLedger = dependencies.buildLedger ?? buildCanonicalQuarterlyLedger
+  return runAbortableTask('FORWARD_BASIS', async (signal) => {
+    const cachedSupplemental = input.preloadedSupplemental !== undefined
+      ? null
+      : input.skipSupplemental ? null : await loadCached(input.company).catch(() => null)
+    const supplemental = input.preloadedSupplemental !== undefined
+      ? await input.preloadedSupplemental
+      : input.skipSupplemental
+      ? { records: [], errors: [] }
+      : cachedSupplemental ?? await loadSupplemental({
+          company: input.company, filingIndex: input.filingIndex, years: input.years, signal,
+        })
+    if (supplemental?.failure) throw new Error(supplemental.failure)
+    signal.throwIfAborted()
+    const ledger = await buildLedger({
+      company: input.company, facts: input.facts, years: input.years, filingIndex: input.filingIndex,
+      supplementalRawFacts: supplemental.records, fallbackStatus: input.fallbackStatus,
+      includeAdjustedEbitda: false,
+    })
+    return completeWithSecExceptionQuarters(
+      input.ticker, buildWiseSheetsHistorical(input.ticker, input.wiseSheetsRows, input.years), ledger.ledger, input.years,
+    )
+  }, timeoutMs)
+}
+
+const CANONICAL_HISTORICAL_METRICS = Object.freeze([
+  'revenue', 'grossProfit', 'ebit', 'operatingCashFlow', 'capitalExpenditures', 'freeCashFlow',
+])
+
+function unavailableHistoricalEntry(status, reason) {
+  return { value: null, classification: null, status, reason, components: [] }
+}
+
+export function canonicalHistoricalForApi(canonical, years, unavailableStatus = HISTORICAL_VALIDATION_STATUS.MISSING_BUT_AVAILABLE) {
+  const calendarActuals = {}
+  const ltm = {}
+  for (const metric of CANONICAL_HISTORICAL_METRICS) {
+    calendarActuals[metric] = Object.fromEntries(years.map((year) => [year,
+      canonical?.calendarActuals?.[metric]?.[year] ?? unavailableHistoricalEntry(unavailableStatus, 'CANONICAL_RESULT_UNAVAILABLE'),
+    ]))
+    ltm[metric] = canonical?.ltm?.[metric] ?? unavailableHistoricalEntry(unavailableStatus, 'CANONICAL_RESULT_UNAVAILABLE')
+  }
+  return { calendarActuals, ltm }
+}
+
+function localDateString(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows = [], options = {}) {
+  const profile = options.latencyProfile ?? null
+  if (profile) {
+    profile.caches ??= {}
+    profile.flags ??= {}
+  }
+  const auditedFinancials = await (options.auditedFinancialsLoader ?? loadAuditedFinancials)(ticker, years.actual)
+  const sourceResults = await Promise.all([
+    measureLatency(profile, 'marketQuote', () => runBoundedTask('MARKET_QUOTE', () =>
+      (options.priceLoader ?? getPrice)(supabase, ticker), INTERACTIVE_SOURCE_TIMEOUT_MS)),
+    measureLatency(profile, 'yahooFundamentals', () => runBoundedTask('YAHOO_FUNDAMENTALS', () =>
+      (options.fundamentalsLoader ?? fetchYahooFundamentals)(ticker), INTERACTIVE_SOURCE_TIMEOUT_MS)),
+    measureLatency(profile, 'secCompanyResolution', () => runAbortableTask(
+      'SEC_COMPANY_RESOLUTION', (signal) => (options.companyResolver ?? resolveCompany)(ticker, { signal }), SEC_SOURCE_TIMEOUT_MS,
+    )),
+    measureLatency(profile, 'yahooChart', () => runBoundedTask('YAHOO_CHART', () =>
+      (options.chartLoader ?? fetchYahooChart)(ticker, '1y'), INTERACTIVE_SOURCE_TIMEOUT_MS)),
   ])
-  const filingIndex = company && !auditedFinancials ? await buildFilingIndex(company).catch(() => null) : null
+  const [quote, fundamentals, company, chart] = sourceResults.map((result) => result.value)
+  const sourceDiagnostics = sourceResults.map((result) => result.diagnostic).filter(Boolean)
+  const filingIndexResult = company
+    ? await measureLatency(profile, 'secFilingIndex', () => runAbortableTask(
+      'SEC_FILING_INDEX', (signal) => (options.filingIndexLoader ?? buildFilingIndex)(company, { signal }), SEC_SOURCE_TIMEOUT_MS,
+    ))
+    : { value: null, diagnostic: null }
+  const filingIndex = filingIndexResult.value
+  if (filingIndexResult.diagnostic) sourceDiagnostics.push(filingIndexResult.diagnostic)
   const issuerClassification = classifyIssuer({ ticker, company, filings: filingIndex?.filings ?? [] })
   const operatingCompany = isOperatingCompanyClassification(issuerClassification.classification)
-  const facts = company && operatingCompany
-    ? await settleWithin(getCompanyFacts(company.cik), null)
-    : null
-  const cachedSupplemental = company && operatingCompany && !auditedFinancials
-    ? await loadLatestSupplementalSourceFacts(company).catch(() => null)
-    : null
-  const supplemental = company && filingIndex && operatingCompany && !auditedFinancials
-    ? cachedSupplemental ?? await loadSupplementalFilingFacts({ company, filingIndex, years: years.actual }).catch(() => ({ records: [], errors: [] }))
-    : { records: [], errors: [] }
-  const historicalLedger = company && facts
-    ? await buildCanonicalQuarterlyLedger({
-      company,
-      facts,
-      years: years.actual,
-      filingIndex,
-      supplementalRawFacts: supplemental.records,
-      fallbackStatus: issuerClassification.financialStatus ?? HISTORICAL_VALIDATION_STATUS.MISSING_BUT_AVAILABLE,
-    })
-    : null
-  const normalizedHistorical = completeWithSecExceptionQuarters(
-    ticker,
-    wiseSheetsHistorical,
-    historicalLedger?.ledger,
-    years.actual,
-  )
+  const factsResult = company && operatingCompany
+    ? await measureLatency(profile, 'secCompanyFacts', () => runAbortableTask(
+      'SEC_COMPANY_FACTS', (signal) => (options.companyFactsLoader ?? getCompanyFacts)(company.cik, { signal }), SEC_SOURCE_TIMEOUT_MS,
+    ))
+    : { value: null, diagnostic: null }
+  const facts = factsResult.value
+  if (factsResult.diagnostic) sourceDiagnostics.push(factsResult.diagnostic)
+  const cacheKey = `${ticker}:${years.actual.join('-')}${options.profileCacheKey ?? ''}`
+  let canonicalHistoryRebuilt = false
+  const canonicalCached = company && facts && filingIndex && operatingCompany
+    ? await measureLatency(profile, 'canonicalCacheLookup', () => canonicalHistoryCache.get(cacheKey, () => {
+        canonicalHistoryRebuilt = true
+        return measureLatency(profile, 'canonicalHistoricalRebuild', () =>
+          (options.canonicalHistoricalBuilder ?? buildCanonicalHistoricalFinancials)({
+          ticker,
+          wiseSheetsRows,
+          company,
+          facts,
+          filings: filingIndex,
+          years: years.actual,
+          asOfDate: localDateString(),
+          targetedSecTimeoutMs: SEC_SOURCE_TIMEOUT_MS,
+          onTiming: (stage, elapsedMs, details) => recordLatency(profile, stage, elapsedMs, details),
+        }))
+      }, {
+        refresh: Boolean(options.refreshCanonical),
+        waitForRefresh: Boolean(options.refreshCanonical),
+      }))
+      .catch((error) => ({
+        value: { canonical: null, failure: error?.message ?? 'CANONICAL_HISTORICAL_BUILD_FAILED' },
+        cache: { state: 'ERROR', ageMs: null, refreshing: false },
+      }))
+    : { value: { canonical: null, failure: null }, cache: { state: 'UNAVAILABLE', ageMs: null, refreshing: false } }
+  const auditedAdjustedEbitdaComplete = hasCompleteAuditedAdjustedEbitda(auditedFinancials, years.actual)
+  const needsSupplemental = Boolean(company && facts && operatingCompany &&
+    (options.includeAdjustedEbitda || options.includeForwardBasis))
+  const supplementalPromise = needsSupplemental
+    ? measureLatency(profile, 'supplementalSec', () => loadSupplementalProductionTask({
+        company, filingIndex, years: years.actual, skipSupplemental: false,
+      }, options.supplementalDependencies ?? {}, SEC_SOURCE_TIMEOUT_MS))
+    : Promise.resolve({ records: [], errors: [], failure: null })
+  const adjustedLoader = () => measureLatency(profile, 'adjustedEbitda', () => loadAdjustedEbitdaProductionTask({
+    company,
+    facts,
+    years: years.actual,
+    filingIndex,
+    skipSupplemental: !operatingCompany || auditedAdjustedEbitdaComplete,
+    preloadedSupplemental: needsSupplemental && !auditedAdjustedEbitdaComplete ? supplementalPromise : undefined,
+    fallbackStatus: issuerClassification.financialStatus ?? HISTORICAL_VALIDATION_STATUS.MISSING_BUT_AVAILABLE,
+  }, options.adjustedEbitdaDependencies ?? {}))
+  const adjustedPromise = company && facts
+    ? options.includeAdjustedEbitda
+      ? adjustedEbitdaCache.get(cacheKey, adjustedLoader, {
+          refresh: Boolean(options.refreshAdjustedEbitda),
+          waitForRefresh: Boolean(options.refreshAdjustedEbitda),
+        })
+      : adjustedEbitdaCache.peek(cacheKey)
+    : Promise.resolve({ value: null, cache: { state: 'UNAVAILABLE', ageMs: null, refreshing: false } })
+  const forwardBasisPromise = company && facts && options.includeForwardBasis
+    ? measureLatency(profile, 'forwardBasis', () => loadLegacyForwardBasisProductionTask({
+        ticker, company, facts, years: years.actual, filingIndex, wiseSheetsRows,
+        skipSupplemental: !operatingCompany,
+        preloadedSupplemental: needsSupplemental ? supplementalPromise : undefined,
+        fallbackStatus: issuerClassification.financialStatus ?? HISTORICAL_VALIDATION_STATUS.MISSING_BUT_AVAILABLE,
+      }, options.forwardBasisDependencies ?? {}))
+    : Promise.resolve({ value: null, diagnostic: null })
+  const [adjustedCached, forwardBasisResult] = await Promise.all([adjustedPromise, forwardBasisPromise])
+  const adjustedEbitdaPending = Boolean(company && facts && !adjustedCached.value && !options.includeAdjustedEbitda)
+  const adjustedEbitdaLoad = adjustedCached.value ?? {
+    ledger: null,
+    supplemental: { records: [], errors: [] },
+    failure: adjustedEbitdaPending ? 'ADJUSTED_EBITDA_LOADING' : null,
+  }
+  const canonicalProduction = canonicalCached.value
+  if (profile) {
+    profile.caches.canonicalHistory = canonicalCached.cache?.state ?? 'UNAVAILABLE'
+    profile.flags.canonicalHistoryRebuilt = canonicalHistoryRebuilt
+    profile.flags.adjustedEbitdaRan = Boolean(options.includeAdjustedEbitda)
+  }
+  const rowConstructionStartedAt = performance.now()
+  const historicalLedger = adjustedEbitdaLoad.ledger
+  const supplemental = adjustedEbitdaLoad.supplemental
+  const canonical = canonicalProduction?.canonical ?? null
+  const legacyForwardHistorical = forwardBasisResult.value
   const secMetricPeriods = Object.fromEntries(Object.entries({
     revenue: METRIC_TAGS.revenue,
     grossProfit: METRIC_TAGS.grossProfit,
@@ -295,37 +646,39 @@ async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical =
   }).map(([metric, tags]) => [metric, normalizeCumulativeQuarterlyFacts(incomePeriodFacts(facts, tags, company?.cik))]))
 
   const unavailableStatus = issuerClassification.financialStatus ?? HISTORICAL_VALIDATION_STATUS.MISSING_BUT_AVAILABLE
-  const unavailableActuals = Object.fromEntries(['revenue', 'grossProfit', 'ebitda', 'operatingCashFlow', 'capitalExpenditures', 'freeCashFlow'].map((metric) => [metric,
+  const adjustedFailureStatus = adjustedEbitdaLoad.failure
+    ? 'MISSING_SOURCE_DATA'
+    : unavailableStatus
+  const unavailableActuals = Object.fromEntries(['ebitda'].map((metric) => [metric,
     Object.fromEntries(years.actual.map((year) => [year, {
       value: null,
       components: [],
       sourceType: 'Unavailable',
-      validationStatus: unavailableStatus,
-      method: unavailableStatus,
-      warnings: [issuerClassification.reason],
+      validationStatus: adjustedFailureStatus,
+      method: adjustedEbitdaLoad.failure ?? adjustedFailureStatus,
+      warnings: [adjustedEbitdaLoad.failure ?? issuerClassification.reason],
     }]))]))
+  const canonicalHistorical = canonicalHistoricalForApi(canonical, years.actual, unavailableStatus)
   const calendarizedActuals = {
-    revenue: normalizedHistorical.calendarActuals.revenue ?? unavailableActuals.revenue,
-    grossProfit: normalizedHistorical.calendarActuals.grossProfit ?? unavailableActuals.grossProfit,
-    operatingCashFlow: normalizedHistorical.calendarActuals.operatingCashFlow ?? unavailableActuals.operatingCashFlow,
-    capitalExpenditures: normalizedHistorical.calendarActuals.capitalExpenditures ?? unavailableActuals.capitalExpenditures,
-    freeCashFlow: normalizedHistorical.calendarActuals.freeCashFlow ?? unavailableActuals.freeCashFlow,
+    ...canonicalHistorical.calendarActuals,
     ebitda: historicalLedger?.calendarActuals?.ebitda ?? unavailableActuals.ebitda,
   }
   if (auditedFinancials) {
     for (const metric of ['ebitda']) {
       for (const year of years.actual) {
         const auditedEntry = auditedFinancials.actuals[metric]?.[year]
-        if (auditedEntry) calendarizedActuals[metric][year] = auditedEntry
+        if (isUsableAdjustedEbitda(auditedEntry)) calendarizedActuals[metric][year] = auditedEntry
       }
     }
   }
   const unavailableLtm = { value: null, components: [], sourceType: 'Unavailable', validationStatus: unavailableStatus, method: unavailableStatus }
+  const unavailableAdjustedLtm = { ...unavailableLtm, validationStatus: adjustedFailureStatus,
+    method: adjustedEbitdaLoad.failure ?? adjustedFailureStatus, warnings: [adjustedEbitdaLoad.failure].filter(Boolean) }
   const ltm = {
-    revenue: normalizedHistorical.ltm.revenue ?? unavailableLtm,
-    grossProfit: normalizedHistorical.ltm.grossProfit ?? unavailableLtm,
-    ebitda: auditedFinancials?.ltm?.ebitda ?? historicalLedger?.adjustedEbitda?.ltm ?? unavailableLtm,
-    freeCashFlow: normalizedHistorical.ltm.freeCashFlow ?? unavailableLtm,
+    ...canonicalHistorical.ltm,
+    ebitda: isUsableAdjustedEbitda(auditedFinancials?.ltm?.ebitda)
+      ? auditedFinancials.ltm.ebitda
+      : historicalLedger?.adjustedEbitda?.ltm ?? unavailableAdjustedLtm,
   }
   const freeCashFlowActuals = calendarizedActuals.freeCashFlow
   // LTM is a historical financial metric. Do not substitute a provider
@@ -333,9 +686,14 @@ async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical =
   // Missing SEC coverage must remain unavailable in the table.
   const ltmRevenue = ltm.revenue
   const ltmGrossProfit = ltm.grossProfit
+  const ltmEbit = ltm.ebit
   const ltmEbitda = ltm.ebitda
   assertCanonicalAdjustedEbitdaEntry(ltmEbitda, ADJUSTED_EBITDA_PERIOD.LTM)
   const ltmFreeCashFlow = ltm.freeCashFlow
+  const forwardBasisRevenue = legacyForwardHistorical?.ltm?.revenue ?? unavailableLtm
+  const forwardBasisGrossProfit = legacyForwardHistorical?.ltm?.grossProfit ?? unavailableLtm
+  const forwardBasisFreeCashFlow = legacyForwardHistorical?.ltm?.freeCashFlow ?? unavailableLtm
+  const forwardBasisAvailable = Boolean(legacyForwardHistorical)
   const revenueWeights = historicalSeasonality(secMetricPeriods.revenue)
   const calendarizedEstimates = {
     revenue: mergeCalendarValues(
@@ -369,12 +727,10 @@ async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical =
         : null,
       enterpriseValue: null,
     }
-  // Yahoo's chartPreviousClose can describe the beginning of a multi-month
-  // range. The penultimate daily bar is the actual prior trading close.
-  const dailyBase = chart?.points?.at(-2)?.close ?? chart?.previousClose ?? null
+  const dailyBase = quote?.previousClose ?? chart?.previousClose ?? latestCompletedTradingClose(chart?.points)
   const financialTimestamp = [
     ...Object.values(secMetricPeriods).flat().map((period) => period.filed),
-    ...Object.values(normalizedHistorical.records ?? {}).flat().map((period) => period.filingDate),
+    ...Object.values(canonical?.records ?? {}).flat().map((period) => period.filingDate),
     cash.source?.filed,
     debt.source?.filed,
     shares.source?.filed,
@@ -400,8 +756,27 @@ async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical =
     ...Object.fromEntries(years.actual.map((year) => [`${year}A`, freeCashFlowActuals[year] ?? null])),
     LTM: ltmFreeCashFlow,
   }
+  const ebit = {
+    ...Object.fromEntries(years.actual.map((year) => [`${year}A`, calendarizedActuals.ebit?.[year] ?? null])),
+    LTM: ltmEbit,
+  }
+  const operatingCashFlow = {
+    ...Object.fromEntries(years.actual.map((year) => [`${year}A`, calendarizedActuals.operatingCashFlow[year]])),
+    LTM: ltm.operatingCashFlow,
+  }
+  const capitalExpenditures = {
+    ...Object.fromEntries(years.actual.map((year) => [`${year}A`, calendarizedActuals.capitalExpenditures[year]])),
+    LTM: ltm.capitalExpenditures,
+  }
   revenue.NTM = ntmRevenue
-  grossProfit.NTM = deriveMarginBasedForwardMetric(ntmRevenue, ltmGrossProfit, ltmRevenue, 'gross-profit', 'NTM')
+  Object.assign(grossProfit, buildMarginBasedForwardSeries({
+    revenue, estimateYears: years.estimate, ntmRevenue,
+    basisMetric: forwardBasisGrossProfit, basisRevenue: forwardBasisRevenue, metricName: 'gross-profit',
+  }))
+  Object.assign(ebit, buildMarginBasedForwardSeries({
+    revenue, estimateYears: years.estimate, ntmRevenue,
+    basisMetric: ltmEbit, basisRevenue: ltmRevenue, metricName: 'ebit',
+  }))
   ebitda.NTM = {
     value: null,
     components: [],
@@ -410,10 +785,16 @@ async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical =
     method: 'NO_COMPANY_DEFINED_ADJUSTED_EBITDA_CONSENSUS',
     warnings: ['Adjusted EBITDA estimates are not synthesized from a trailing margin.'],
   }
-  freeCashFlow.NTM = deriveMarginBasedForwardMetric(ntmRevenue, ltmFreeCashFlow, ltmRevenue, 'free-cash-flow', 'NTM')
+  Object.assign(freeCashFlow, buildMarginBasedForwardSeries({
+    revenue, estimateYears: years.estimate, ntmRevenue,
+    basisMetric: forwardBasisFreeCashFlow, basisRevenue: forwardBasisRevenue, metricName: 'free-cash-flow',
+  }))
+  if (!forwardBasisAvailable) {
+    const forwardStatus = forwardBasisResult.diagnostic?.reason ?? 'FORWARD_BASIS_UNAVAILABLE'
+    failClosedForwardBasis([grossProfit, freeCashFlow], years.estimate, forwardStatus)
+  }
   for (const year of years.estimate) {
     const period = `${year}E`
-    grossProfit[period] = deriveMarginBasedForwardMetric(revenue[period], ltmGrossProfit, ltmRevenue, 'gross-profit', period)
     ebitda[period] = {
       value: null,
       components: [],
@@ -422,13 +803,15 @@ async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical =
       method: 'NO_COMPANY_DEFINED_ADJUSTED_EBITDA_CONSENSUS',
       warnings: ['Adjusted EBITDA estimates are not synthesized from a trailing margin.'],
     }
-    freeCashFlow[period] = deriveMarginBasedForwardMetric(revenue[period], ltmFreeCashFlow, ltmRevenue, 'free-cash-flow', period)
   }
   const metricValues = (metric) => Object.fromEntries(Object.entries(metric).map(([period, entry]) => [period, entry?.value ?? null]))
   const revenueValues = metricValues(revenue)
   const grossProfitValues = metricValues(grossProfit)
+  const ebitValues = metricValues(ebit)
   const ebitdaValues = metricValues(ebitda)
   const freeCashFlowValues = metricValues(freeCashFlow)
+  const operatingCashFlowValues = metricValues(operatingCashFlow)
+  const capitalExpendituresValues = metricValues(capitalExpenditures)
 
   const ranges = quoteRanges(chart, quote?.price)
   const row = {
@@ -452,6 +835,9 @@ async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical =
     metrics: {
       revenue: revenueValues,
       grossProfit: grossProfitValues,
+      ebit: ebitValues,
+      operatingCashFlow: operatingCashFlowValues,
+      capitalExpenditures: capitalExpendituresValues,
       ebitda: ebitdaValues,
       freeCashFlow: freeCashFlowValues,
       revenueGrowth: Object.fromEntries(Object.keys(revenueValues).map((period, index, list) => [period, index ? pct(revenueValues[period], revenueValues[list[index - 1]]) : null])),
@@ -461,6 +847,7 @@ async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical =
     multiples: {
       evRevenue: Object.fromEntries(Object.keys(revenueValues).map((period) => [period, valuationMultiple(structure.enterpriseValue, revenueValues[period])])),
       evGrossProfit: Object.fromEntries(Object.keys(grossProfitValues).map((period) => [period, valuationMultiple(structure.enterpriseValue, grossProfitValues[period])])),
+      evEbit: Object.fromEntries(Object.keys(ebitValues).map((period) => [period, valuationMultiple(structure.enterpriseValue, ebitValues[period])])),
       evEbitda: Object.fromEntries(Object.entries(ebitda).map(([period, entry]) =>
         [period, valuationMultiple(structure.enterpriseValue, entry?.value ?? null)])),
       evFreeCashFlow: Object.fromEntries(Object.keys(freeCashFlowValues).map((period) => [period, valuationMultiple(structure.enterpriseValue, freeCashFlowValues[period])])),
@@ -472,20 +859,42 @@ async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical =
     provenance: {
       revenue,
       grossProfit,
+      ebit,
+      operatingCashFlow,
+      capitalExpenditures,
       ebitda,
       freeCashFlow,
       capital: { cash: cash.source, debt: debt.source, dilutedShares: shares.source },
       market: { sourceType: 'Yahoo Finance market quote', confidence: 'Medium', retrievedAt: new Date().toISOString() },
     },
+    canonicalHistorical: {
+      latestReportedPeriods: canonical?.latestReportedPeriods ?? {},
+      cache: canonicalCached.cache,
+      failures: [
+        ...(canonical?.failures ?? []),
+        ...(canonicalProduction?.failure ? [{ stage: 'CANONICAL_HISTORICAL', reason: canonicalProduction.failure }] : []),
+        ...(adjustedEbitdaLoad.failure ? [{ stage: 'ADJUSTED_EBITDA', reason: adjustedEbitdaLoad.failure }] : []),
+        ...(forwardBasisResult.diagnostic ? [{ stage: 'FORWARD_BASIS', reason: forwardBasisResult.diagnostic.reason }] : []),
+        ...sourceDiagnostics,
+      ].slice(0, 50),
+    },
+    forwardBasisInputs: {
+      revenue: forwardBasisRevenue,
+      grossProfit: forwardBasisGrossProfit,
+      ebit: ltmEbit,
+      ebitRevenue: ltmRevenue,
+      freeCashFlow: forwardBasisFreeCashFlow,
+    },
+    consensusContext: { revenueWeights, revenuePeriods: secMetricPeriods.revenue },
+    consensusSnapshot: { updatedAt: new Date().toISOString(), state: 'READY' },
+    loadingSections: { adjustedEbitda: adjustedEbitdaPending, forwardBasis: !forwardBasisAvailable },
     marketTimestamp: quote?.fetchedAt ?? null,
     financialTimestamp,
-    coverage: wiseSheetsHistorical
-      ? 'WiseSheets primary quarterly actuals with missing-quarter SEC exceptions + SEC Adjusted EBITDA + Yahoo consensus'
-      : 'SEC exception quarters only where WiseSheets observations are unavailable + SEC Adjusted EBITDA + Yahoo consensus',
+    coverage: 'Canonical WiseSheets + SEC historical GAAP actuals + SEC Adjusted EBITDA + Yahoo consensus',
     historicalAudit: Object.values(calendarizedActuals)
       .flatMap((byYear) => Object.values(byYear ?? {}))
       .reduce((summary, entry) => {
-        const status = entry?.validationStatus ?? unavailableStatus
+        const status = entry?.status ?? entry?.validationStatus ?? unavailableStatus
         summary[status] = (summary[status] ?? 0) + 1
         return summary
       }, {}),
@@ -493,36 +902,306 @@ async function buildValuationRow(supabase, ticker, years, wiseSheetsHistorical =
   row.auditInputs = { dailyBase, high52: ranges.high52, low52: ranges.low52 }
   row.audit = buildRowAudit(row)
   delete row.auditInputs
+  const compactRow = compactValuationRowForClient(row)
+  recordLatency(profile, 'rowConstructionAudit', performance.now() - rowConstructionStartedAt)
+  return compactRow
+}
+
+function loadingFinancialRow(ticker, quote, chart, diagnostic = null) {
+  const ranges = quoteRanges(chart, quote?.price)
+  const dailyBase = quote?.previousClose ?? chart?.previousClose ?? latestCompletedTradingClose(chart?.points)
+  return {
+    ticker,
+    name: ticker,
+    currency: quote?.currency ?? 'USD',
+    price: quote?.price ?? null,
+    dailyChange: quote?.price != null && dailyBase != null ? quote.price - dailyBase : null,
+    dailyPercent: pct(quote?.price, dailyBase),
+    ranges,
+    metrics: {},
+    multiples: {},
+    provenance: { market: { sourceType: 'Yahoo Finance market quote', retrievedAt: new Date().toISOString() } },
+    canonicalHistorical: { failures: diagnostic ? [diagnostic] : [] },
+    loadingSections: { financialSnapshot: diagnostic?.reason !== 'FINANCIAL_SNAPSHOT_STORE_NOT_CONFIGURED', adjustedEbitda: true, forwardBasis: true },
+    financialSnapshot: { state: 'MISSING', updatedAt: null, engineVersion: null },
+    error: diagnostic?.reason === 'FINANCIAL_SNAPSHOT_STORE_NOT_CONFIGURED' ? diagnostic.reason : null,
+    marketTimestamp: quote?.fetchedAt ?? null,
+  }
+}
+
+export function applyMarketDataToFinancialSnapshot(snapshot, quote, chart) {
+  if (!snapshot) return null
+  const row = structuredClone(snapshot)
+  const ranges = chart ? quoteRanges(chart, quote?.price) : row.ranges ?? quoteRanges(null, quote?.price)
+  const dailyBase = quote?.previousClose ?? chart?.previousClose ?? latestCompletedTradingClose(chart?.points)
+  const capital = row.capital ?? {}
+  const structure = enterpriseValue({
+    price: quote?.price,
+    dilutedShares: capital.dilutedShares,
+    debt: capital.debt,
+    cash: capital.cash,
+  })
+  row.price = quote?.price ?? null
+  row.currency = quote?.currency ?? row.currency ?? 'USD'
+  row.dailyChange = quote?.price != null && dailyBase != null ? quote.price - dailyBase : row.dailyChange ?? null
+  row.dailyPercent = dailyBase != null ? pct(quote?.price, dailyBase) : row.dailyPercent ?? null
+  row.ranges = ranges
+  row.marketTimestamp = quote?.fetchedAt ?? null
+  row.capital = { ...capital, equityValue: structure.equityValue, enterpriseValue: structure.enterpriseValue }
+  const metrics = row.metrics ?? {}
+  row.multiples = {
+    evRevenue: Object.fromEntries(Object.entries(metrics.revenue ?? {}).map(([period, value]) => [period, valuationMultiple(structure.enterpriseValue, value)])),
+    evGrossProfit: Object.fromEntries(Object.entries(metrics.grossProfit ?? {}).map(([period, value]) => [period, valuationMultiple(structure.enterpriseValue, value)])),
+    evEbit: Object.fromEntries(Object.entries(metrics.ebit ?? {}).map(([period, value]) => [period, valuationMultiple(structure.enterpriseValue, value)])),
+    evEbitda: Object.fromEntries(Object.entries(metrics.ebitda ?? {}).map(([period, value]) => [period, valuationMultiple(structure.enterpriseValue, value)])),
+    evFreeCashFlow: Object.fromEntries(Object.entries(metrics.freeCashFlow ?? {}).map(([period, value]) => [period, valuationMultiple(structure.enterpriseValue, value)])),
+  }
+  row.provenance ??= {}
+  row.provenance.market = { sourceType: 'Yahoo Finance market quote', confidence: 'Medium', retrievedAt: new Date().toISOString() }
+  if (row.consensusSnapshot) row.consensusSnapshot.state = consensusState(row.consensusSnapshot.updatedAt)
+  row.loadingSections = { financialSnapshot: false, adjustedEbitda: false, forwardBasis: false }
+  row.auditInputs = { dailyBase, high52: ranges.high52, low52: ranges.low52 }
+  row.audit = buildRowAudit(row)
+  delete row.auditInputs
   return compactValuationRowForClient(row)
 }
 
-export async function getValuationRows(supabase, inputTickers = []) {
+export async function loadValuationMarketData(supabase, tickers, options = {}) {
+  const now = options.now ?? new Date()
+  const cutoff = new Date(now.getTime() - 370 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const historyPromise = supabase?.from
+    ? Promise.resolve(supabase.from('price_history').select('ticker, date, close').in('ticker', tickers).gte('date', cutoff))
+        .catch(() => ({ data: [], error: null }))
+    : Promise.resolve({ data: [], error: null })
+  const quoteLoader = options.quoteLoader ?? getPrices
+  const [quotes, historyResult] = await Promise.all([
+    quoteLoader(supabase, tickers, { refresh: Boolean(options.refresh) }), historyPromise,
+  ])
+  const historyByTicker = new Map(tickers.map((ticker) => [ticker, []]))
+  for (const point of historyResult.data ?? []) {
+    const ticker = String(point.ticker ?? '').toUpperCase()
+    if (historyByTicker.has(ticker) && Number.isFinite(Number(point.close))) {
+      historyByTicker.get(ticker).push({ date: point.date, close: Number(point.close) })
+    }
+  }
+  for (const [ticker, points] of historyByTicker) {
+    points.sort((left, right) => String(left.date).localeCompare(String(right.date)))
+    const quote = quotes.get(ticker)
+    if (quote && points.length) quotes.set(ticker, {
+      ...quote, previousClose: quote.previousClose ?? latestCompletedTradingClose(points, now), chart: { points },
+    })
+  }
+  if (!options.refresh) return quotes
+  const stale = tickers.filter((ticker) => !isMarketHistoryFresh(historyByTicker.get(ticker), now))
+  const chartLoader = options.chartLoader ?? fetchYahooChart
+  const settled = await Promise.allSettled(stale.map((ticker) =>
+    runBoundedTask('YAHOO_CHART', () => chartLoader(ticker, '1y'), INTERACTIVE_SOURCE_TIMEOUT_MS)))
+  stale.forEach((ticker, index) => {
+    const result = settled[index]
+    const chart = result.status === 'fulfilled' ? result.value.value : null
+    const quote = quotes.get(ticker)
+    if (quote) quotes.set(ticker, { ...quote, chart })
+  })
+  return quotes
+}
+
+function consensusState(updatedAt) {
+  const ageMs = Date.now() - Date.parse(updatedAt ?? '')
+  return Number.isFinite(ageMs) && ageMs <= CONSENSUS_CACHE_TTL_MS ? 'READY' : 'STALE'
+}
+
+export function applyConsensusToFinancialSnapshot(snapshot, fundamentals, years, updatedAt = new Date().toISOString()) {
+  const row = structuredClone(snapshot)
+  const context = row.consensusContext ?? {}
+  const basis = row.forwardBasisInputs ?? {}
+  const revenueWeights = context.revenueWeights ?? []
+  const revenuePeriods = context.revenuePeriods ?? []
+  const consensus = fundamentals?.estimates?.revenueConsensus ?? []
+  const calendarizedEstimates = mergeCalendarValues(consensus.map((estimate) =>
+    calendarizeAnnualEstimateWithReportedQuarters(estimate, years.estimate, revenueWeights, revenuePeriods)), years.estimate)
+  const revenue = row.provenance?.revenue ?? {}
+  for (const year of years.estimate) {
+    const period = `${year}E`
+    revenue[period] = calendarizedEstimates[year]?.value != null ? calendarizedEstimates[year] : revenue[period] ?? null
+  }
+  revenue.NTM = calculateNtmFromAnnualConsensus(consensus, revenueWeights, revenuePeriods)
+  row.provenance.revenue = revenue
+  const grossProfit = row.provenance.grossProfit ?? {}
+  Object.assign(grossProfit, buildMarginBasedForwardSeries({
+    revenue, estimateYears: years.estimate, ntmRevenue: revenue.NTM,
+    basisMetric: basis.grossProfit, basisRevenue: basis.revenue, metricName: 'gross-profit',
+  }))
+  const ebit = row.provenance.ebit ?? {}
+  Object.assign(ebit, buildMarginBasedForwardSeries({
+    revenue, estimateYears: years.estimate, ntmRevenue: revenue.NTM,
+    basisMetric: basis.ebit, basisRevenue: basis.ebitRevenue, metricName: 'ebit',
+  }))
+  const freeCashFlow = row.provenance.freeCashFlow ?? {}
+  Object.assign(freeCashFlow, buildMarginBasedForwardSeries({
+    revenue, estimateYears: years.estimate, ntmRevenue: revenue.NTM,
+    basisMetric: basis.freeCashFlow, basisRevenue: basis.revenue, metricName: 'free-cash-flow',
+  }))
+  row.provenance.grossProfit = grossProfit
+  row.provenance.ebit = ebit
+  row.provenance.freeCashFlow = freeCashFlow
+  const values = (entries) => Object.fromEntries(Object.entries(entries).map(([period, entry]) => [period, entry?.value ?? null]))
+  row.metrics.revenue = values(revenue)
+  row.metrics.grossProfit = values(grossProfit)
+  row.metrics.ebit = values(ebit)
+  row.metrics.freeCashFlow = values(freeCashFlow)
+  row.metrics.revenueGrowth = Object.fromEntries(Object.keys(row.metrics.revenue).map((period, index, list) =>
+    [period, index ? pct(row.metrics.revenue[period], row.metrics.revenue[list[index - 1]]) : null]))
+  row.metrics.grossMargin = Object.fromEntries(Object.keys(row.metrics.grossProfit).map((period) =>
+    [period, row.metrics.revenue[period] ? row.metrics.grossProfit[period] / row.metrics.revenue[period] : null]))
+  row.multiples.evEbit = Object.fromEntries(Object.entries(row.metrics.ebit).map(([period, value]) =>
+    [period, valuationMultiple(row.capital?.enterpriseValue, value)]))
+  row.consensusSnapshot = { updatedAt, state: 'READY' }
+  row.audit = buildRowAudit(row)
+  return row
+}
+
+export async function getValuationRows(supabase, inputTickers = [], options = {}) {
+  const profile = options.latencyProfile ?? null
+  if (profile) {
+    profile.caches ??= {}
+    profile.flags ??= {}
+  }
+  const requestStartedAt = performance.now()
   const tickers = [...new Set(inputTickers.map((ticker) => String(ticker).trim().toUpperCase()).filter(Boolean))].slice(0, 40)
   const now = new Date()
   const currentYear = now.getFullYear()
   const years = { actual: [currentYear - 3, currentYear - 2, currentYear - 1], estimate: [currentYear, currentYear + 1] }
-  const cacheKey = `calendar-v9-wisesheets-primary:${tickers.join(',')}:${years.actual.join(',')}`
+  const cacheKey = `snapshot-market-v1:${tickers.join(',')}:${years.actual.join(',')}${options.profileCacheKey ?? ''}`
   const cached = cache.get(cacheKey)
-  if (cached && cached.expiresAt > Date.now()) return cached.value
+  const responseHasPendingSources = (value) => value?.rows?.some((row) => row.loadingSections?.financialSnapshot)
+  const bypassAggregateCache = options.refresh || options.financialRefresh || options.consensusRefresh
+  if (profile) profile.caches.aggregate = cached && cached.expiresAt > Date.now() ? 'HIT' : 'MISS'
+  if (!bypassAggregateCache && cached && cached.expiresAt > Date.now() && !responseHasPendingSources(cached.value)) {
+    recordLatency(profile, 'totalRequest', performance.now() - requestStartedAt)
+    return cached.value
+  }
 
-  if (inFlight.has(cacheKey)) return inFlight.get(cacheKey)
+  if (!bypassAggregateCache && inFlight.has(cacheKey)) return inFlight.get(cacheKey)
 
   const request = (async () => {
-    const wiseSheetsByTicker = await fetchWiseSheetsQuarterlyFinancials(tickers, years.actual).catch(() => new Map())
-    const results = await Promise.allSettled(tickers.map((ticker) =>
-      buildValuationRow(supabase, ticker, years, wiseSheetsByTicker.get(ticker) ?? null)))
+    const activity = options.activityCounters ?? {}
+    activity.secHistoryCalls ??= 0
+    activity.wiseSheetsCalls ??= 0
+    activity.canonicalRebuilds ??= 0
+    activity.adjustedEbitdaRuns ??= 0
+    activity.consensusCalls ??= 0
+    const snapshotRepository = options.snapshotRepository ?? {
+      load: loadFinancialSnapshots,
+      save: saveFinancialSnapshot,
+    }
+    const marketLoader = options.marketLoader ?? loadValuationMarketData
+    const providerLoader = options.providerLoader ?? loadWiseSheetsBatch
+    const financialRowBuilder = options.financialRowBuilder ?? buildValuationRow
+    const providerTickers = options.providerTickers?.length ? options.providerTickers : tickers
+    const quotesPromise = measureLatency(profile, 'marketQuote', () => marketLoader(supabase, providerTickers, {
+      refresh: Boolean(options.refresh),
+    }))
+    let snapshotResult
+    if (options.financialRefresh) {
+      const existingResult = await measureLatency(profile, 'financialSnapshotRead', () =>
+        snapshotRepository.load(supabase, tickers, { actualYears: years.actual }))
+      activity.wiseSheetsCalls += 1
+      const wiseSheetsResult = await measureLatency(profile, 'wiseSheetsAcquisition', () => providerLoader(tickers, {
+        refresh: true,
+        cacheKeySuffix: options.profileCacheKey ?? '',
+      }))
+      if (profile) profile.caches.wiseSheets = wiseSheetsResult.cache?.state ?? 'UNAVAILABLE'
+      const refreshed = new Map()
+      const refreshDiagnostics = []
+      for (const ticker of tickers) {
+        activity.canonicalRebuilds += 1
+        activity.adjustedEbitdaRuns += 1
+        const row = await financialRowBuilder(supabase, ticker, years,
+          (wiseSheetsResult.value ?? []).filter((item) => String(item.ticker).toUpperCase() === ticker), {
+            ...options,
+            refreshCanonical: true,
+            includeAdjustedEbitda: true,
+            refreshAdjustedEbitda: true,
+            includeForwardBasis: true,
+          })
+        const candidate = snapshotFinancialRow(row)
+        const promotion = evaluateFinancialSnapshotPromotion(existingResult.snapshots.get(ticker), candidate, {
+          actualYears: years.actual,
+        })
+        if (!promotion.accepted) {
+          refreshDiagnostics.push({ ticker, ...promotion.diagnostic })
+          refreshed.set(ticker, promotion.snapshot)
+          continue
+        }
+        const saved = await snapshotRepository.save(supabase, ticker, candidate, { actualYears: years.actual })
+        refreshed.set(ticker, saved)
+      }
+      snapshotResult = { snapshots: refreshed, diagnostic: existingResult.diagnostic, refreshDiagnostics }
+    } else if (options.consensusRefresh) {
+      snapshotResult = await measureLatency(profile, 'financialSnapshotRead', () =>
+        snapshotRepository.load(supabase, tickers, { actualYears: years.actual }))
+      const consensusLoader = options.consensusLoader ?? fetchYahooFundamentals
+      const refreshed = new Map()
+      for (const ticker of tickers) {
+        const snapshot = snapshotResult.snapshots.get(ticker)
+        if (!snapshot || snapshot.financialSnapshot?.state === FINANCIAL_SNAPSHOT_STATE.INCOMPATIBLE) continue
+        activity.consensusCalls += 1
+        const consensusResult = await consensusCache.get(ticker, () => runBoundedTask(
+          'CONSENSUS_REFRESH', () => consensusLoader(ticker, snapshot.currency), INTERACTIVE_SOURCE_TIMEOUT_MS,
+        ), { refresh: true, waitForRefresh: true })
+        const fundamentals = consensusResult.value?.value ?? consensusResult.value
+        if (!fundamentals) {
+          refreshed.set(ticker, { ...snapshot, consensusSnapshot: {
+            ...(snapshot.consensusSnapshot ?? {}), state: 'STALE', reason: 'CONSENSUS_REFRESH_FAILED',
+          } })
+          continue
+        }
+        const updated = applyConsensusToFinancialSnapshot(snapshot, fundamentals, years)
+        const saved = await snapshotRepository.save(supabase, ticker, snapshotFinancialRow(updated), {
+          actualYears: years.actual,
+          updatedAt: snapshot.financialSnapshot?.updatedAt,
+        })
+        refreshed.set(ticker, saved)
+      }
+      snapshotResult = { ...snapshotResult, snapshots: new Map([...snapshotResult.snapshots, ...refreshed]) }
+    } else {
+      snapshotResult = await measureLatency(profile, 'financialSnapshotRead', () =>
+        snapshotRepository.load(supabase, tickers, { actualYears: years.actual }))
+      if (profile) {
+        profile.caches.financialSnapshot = snapshotResult.snapshots.size === tickers.length ? 'HIT' : 'PARTIAL'
+        profile.flags.canonicalHistoryRebuilt = false
+        profile.flags.adjustedEbitdaRan = false
+      }
+    }
+    const quotes = await quotesPromise
+    const results = tickers.map((ticker) => {
+      const snapshot = snapshotResult.snapshots.get(ticker)
+      const usable = snapshot && snapshot.financialSnapshot?.state !== FINANCIAL_SNAPSHOT_STATE.INCOMPATIBLE
+      const diagnostic = snapshot?.financialSnapshot?.state === FINANCIAL_SNAPSHOT_STATE.INCOMPATIBLE
+        ? { stage: 'FINANCIAL_SNAPSHOT_READ', reason: 'FINANCIAL_SNAPSHOT_INCOMPATIBLE',
+            detail: snapshot.financialSnapshot.reasons?.join(', ') }
+        : snapshotResult.diagnostic
+      return usable
+        ? applyMarketDataToFinancialSnapshot(snapshot, quotes.get(ticker), quotes.get(ticker)?.chart)
+        : loadingFinancialRow(ticker, quotes.get(ticker), quotes.get(ticker)?.chart, diagnostic)
+    })
     const value = {
       periods: { actual: years.actual.map((year) => `${year}A`), ltm: 'LTM', ntm: 'NTM', estimate: years.estimate.map((year) => `${year}E`) },
-      rows: results.map((result, index) => result.status === 'fulfilled'
-        ? result.value
-        : { ticker: tickers[index], name: tickers[index], error: result.reason?.message ?? 'Financial data could not be loaded.' }),
+      rows: results,
       retrievedAt: new Date().toISOString(),
+      diagnostics: [snapshotResult.diagnostic, ...(snapshotResult.refreshDiagnostics ?? [])].filter(Boolean),
+      providerCache: { state: options.financialRefresh
+        ? snapshotResult.refreshDiagnostics?.length ? 'FINANCIAL_REFRESH_DEGRADED_REJECTED' : 'FINANCIAL_REFRESHED' :
+        options.consensusRefresh ? 'CONSENSUS_REFRESHED' : 'NOT_REQUESTED' },
     }
     value.audit = auditSummary(value.rows)
     value.historicalAudit = Object.fromEntries(Object.keys(value.rows[0]?.historicalAudit ?? {}).map((status) => [status,
       value.rows.reduce((total, row) => total + (row.historicalAudit?.[status] ?? 0), 0),
     ]))
-    cache.set(cacheKey, { value, expiresAt: Date.now() + VALUATION_CACHE_TTL_MS })
+    if (!responseHasPendingSources(value)) {
+      cache.set(cacheKey, { value, expiresAt: Date.now() + VALUATION_CACHE_TTL_MS })
+    }
+    recordLatency(profile, 'totalRequest', performance.now() - requestStartedAt)
     return value
   })().finally(() => inFlight.delete(cacheKey))
 

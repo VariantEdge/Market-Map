@@ -574,6 +574,7 @@ export async function buildCanonicalQuarterlyLedger({
   filingIndex = null,
   supplementalRawFacts = [],
   fallbackStatus = HISTORICAL_STATUS.UNAVAILABLE,
+  includeAdjustedEbitda = true,
 }) {
   const companyFactsRecords = createRawFinancialSourceLedger({ company, facts, filingIndex })
   const rawLedger = [...companyFactsRecords, ...supplementalRawFacts]
@@ -595,7 +596,20 @@ export async function buildCanonicalQuarterlyLedger({
   const freeCashFlow = derivePairedMetric(company, 'freeCashFlow', operatingCashFlow.quarters, capitalExpenditures.quarters,
     (left, right) => left - Math.abs(right), 'CFO_MINUS_CAPEX', snapshot)
 
-  const adjustedEbitda = buildCanonicalAdjustedEbitda({ company, rawLedger, years })
+  const adjustedEbitda = includeAdjustedEbitda
+    ? buildCanonicalAdjustedEbitda({ company, rawLedger, years })
+    : {
+        quarters: [],
+        calendarActuals: Object.fromEntries(years.map((year) => [year, {
+          value: null,
+          components: [],
+          sourceType: 'Unavailable',
+          validationStatus: fallbackStatus,
+          method: 'ADJUSTED_EBITDA_EXCLUDED_FROM_FORWARD_BASIS_BUILD',
+          warnings: [],
+        }])),
+        ltm: null,
+      }
 
   const grossProfitAnnual = grossProfitDirect.annual.length
     ? grossProfitDirect.annual

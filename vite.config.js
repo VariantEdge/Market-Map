@@ -12,9 +12,16 @@ import {
   getWatchlistMarketRows,
 } from './api/marketData.js'
 import { getValuationRows } from './api/valuationData.js'
+import { createMemoryFinancialSnapshotRepository } from './server/valuation/financialSnapshot.js'
 
-function marketMapApiPlugin(supabaseUrl, supabaseKey) {
+function marketMapApiPlugin(supabaseUrl, supabaseKey, supabaseServiceRoleKey) {
   const supabase = createClient(supabaseUrl, supabaseKey)
+  const valuationSupabase = supabaseServiceRoleKey
+    ? createClient(supabaseUrl, supabaseServiceRoleKey)
+    : supabase
+  const developmentSnapshots = supabaseServiceRoleKey
+    ? null
+    : createMemoryFinancialSnapshotRepository()
 
   return {
     name: 'market-map-api',
@@ -75,7 +82,14 @@ function marketMapApiPlugin(supabaseUrl, supabaseKey) {
           const tickers = parseTickers(url.searchParams.get('tickers'))
           if (!tickers.length) return writeError(res, 400, 'Missing ?tickers= parameter')
           try {
-            res.end(JSON.stringify(await getValuationRows(supabase, tickers)))
+            const providerTickers = parseTickers(url.searchParams.get('universe'))
+            res.end(JSON.stringify(await getValuationRows(valuationSupabase, tickers, {
+              refresh: url.searchParams.get('refresh') === '1',
+              financialRefresh: url.searchParams.get('financialRefresh') === '1',
+              consensusRefresh: url.searchParams.get('consensusRefresh') === '1',
+              providerTickers,
+              snapshotRepository: developmentSnapshots ?? undefined,
+            })))
           } catch (error) {
             writeError(res, 500, error.message)
           }
@@ -148,7 +162,7 @@ export default defineConfig(({ mode }) => {
   const supabaseKey = env.SUPABASE_ANON_KEY || 'development-anon-key'
 
   return {
-    plugins: [react(), marketMapApiPlugin(supabaseUrl, supabaseKey)],
+    plugins: [react(), marketMapApiPlugin(supabaseUrl, supabaseKey, env.SUPABASE_SERVICE_ROLE_KEY)],
     server: { host: '127.0.0.1' },
   }
 })

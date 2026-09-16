@@ -50,7 +50,7 @@ test('never synthesizes displayed Adjusted EBITDA from GAAP operating metrics', 
   assert.equal(result.calendarActuals.ebitda[2025].value, null)
   assert.equal(result.calendarActuals.freeCashFlow[2025].value, 70)
   assert.equal(result.calendarActuals.revenue[2025].validationStatus, HISTORICAL_STATUS.RECONSTRUCTED)
-  assert.equal(result.calendarActuals.ebitda[2025].validationStatus, HISTORICAL_STATUS.LEGITIMATE_NA)
+  assert.equal(result.calendarActuals.ebitda[2025].validationStatus, 'NOT_REPORTED')
   assert.equal(result.calendarActuals.ebitda[2025].method, 'FOUR_EXACT_CALENDAR_QUARTERS_UNAVAILABLE')
   assert.deepEqual(result.ledger.ebitda, [])
 })

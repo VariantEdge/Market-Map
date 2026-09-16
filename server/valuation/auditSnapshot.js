@@ -83,14 +83,14 @@ export async function loadAuditedFinancials(ticker, years) {
   const tickerRecords = audit.records.filter((record) => record.ticker === ticker)
   if (!tickerRecords.length) return null
 
-  const actuals = Object.fromEntries(['revenue', 'grossProfit', 'ebitda', 'freeCashFlow'].map((metric) => [
+  const actuals = Object.fromEntries(['revenue', 'grossProfit', 'ebit', 'ebitda', 'freeCashFlow'].map((metric) => [
     metric,
     Object.fromEntries(years.map((year) => {
       const record = tickerRecords.find((item) => item.metric === metric && Number(item.calendarYear) === year)
       return [year, record ? entryFromAudit(record, year) : null]
     })),
   ]))
-  const ltm = Object.fromEntries(['revenue', 'grossProfit', 'ebitda', 'freeCashFlow'].map((metric) => {
+  const ltm = Object.fromEntries(['revenue', 'grossProfit', 'ebit', 'ebitda', 'freeCashFlow'].map((metric) => {
     const record = tickerRecords.find((item) => item.metric === metric && item.calendarYear === 'LTM')
     return [metric, record ? entryFromAudit(record, 'LTM') : null]
   }))

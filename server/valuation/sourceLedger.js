@@ -89,6 +89,11 @@ export const METRIC_SOURCE_POLICY = Object.freeze({
     extensionLabel: /^(?:total )?operating (?:income|profit|loss)(?: \(loss\))?$/i,
     exclude: /segment|adjusted|margin|percentage/i,
   },
+  ebit: {
+    concepts: ['OperatingIncomeLoss', 'ProfitLossFromOperatingActivities'],
+    extensionLabel: /^(?:total )?operating (?:income|profit|loss)(?: \(loss\))?$/i,
+    exclude: /segment|adjusted|margin|percentage/i,
+  },
   depreciationAmortization: {
     concepts: [
       'DepreciationDepletionAndAmortization', 'DepreciationAndAmortization',

@@ -1,0 +1,128 @@
+{
+  "description": "SEC Company Facts regression values captured with accession-level provenance for the Phase 5B canonical GAAP financial adapter.",
+  "observations": [
+    {
+      "ticker": "AMZN", "cik": "0001018724", "metric": "operatingCashFlow",
+      "concept": "NetCashProvidedByUsedInOperatingActivities", "value": 115877000000,
+      "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "form": "10-K",
+      "accession": "0001018724-26-000004", "currency": "USD",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1018724/000101872426000004/amzn-20251231.htm"
+    },
+    {
+      "ticker": "AMZN", "cik": "0001018724", "metric": "capitalExpenditures",
+      "concept": "PaymentsToAcquireProductiveAssets", "value": 82999000000,
+      "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "form": "10-K",
+      "accession": "0001018724-26-000004", "currency": "USD",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1018724/000101872426000004/amzn-20251231.htm"
+    },
+    {
+      "ticker": "GEV", "cik": "0001996810", "metric": "grossProfit",
+      "concept": "GrossProfit", "value": 6085000000,
+      "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "form": "10-K",
+      "accession": "0001996810-26-000015", "currency": "USD",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1996810/000199681026000015/gev-20251231.htm"
+    },
+    {
+      "ticker": "GEV", "cik": "0001996810", "metric": "operatingCashFlow",
+      "concept": "NetCashProvidedByUsedInOperatingActivities", "value": 2583000000,
+      "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "form": "10-K",
+      "accession": "0001996810-26-000015", "currency": "USD",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1996810/000199681026000015/gev-20251231.htm"
+    },
+    {
+      "ticker": "GEV", "cik": "0001996810", "metric": "capitalExpenditures",
+      "concept": "PaymentsToAcquireProductiveAssets", "value": 883000000,
+      "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "form": "10-K",
+      "accession": "0001996810-26-000015", "currency": "USD",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1996810/000199681026000015/gev-20251231.htm"
+    },
+    {
+      "ticker": "INTC", "cik": "0000050863", "metric": "grossProfit",
+      "concept": "GrossProfit", "value": 17345000000,
+      "periodStart": "2023-12-31", "periodEnd": "2024-12-28", "form": "10-K",
+      "accession": "0000050863-26-000011", "currency": "USD",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/50863/000005086326000011/intc-20251227.htm"
+    },
+    {
+      "ticker": "INTC", "cik": "0000050863", "metric": "operatingCashFlow",
+      "concept": "NetCashProvidedByUsedInOperatingActivities", "value": 8288000000,
+      "periodStart": "2023-12-31", "periodEnd": "2024-12-28", "form": "10-K",
+      "accession": "0000050863-26-000011", "currency": "USD",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/50863/000005086326000011/intc-20251227.htm"
+    },
+    {
+      "ticker": "INTC", "cik": "0000050863", "metric": "capitalExpenditures",
+      "concept": "PaymentsToAcquirePropertyPlantAndEquipment", "value": 23944000000,
+      "periodStart": "2023-12-31", "periodEnd": "2024-12-28", "form": "10-K",
+      "accession": "0000050863-26-000011", "currency": "USD",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/50863/000005086326000011/intc-20251227.htm"
+    },
+    {
+      "ticker": "NBIS", "cik": "0001513845", "metric": "operatingCashFlow",
+      "concept": "NetCashProvidedByUsedInOperatingActivities", "value": 245600000,
+      "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "form": "20-F",
+      "accession": "0001104659-26-052948", "currency": "USD",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm"
+    },
+    {
+      "ticker": "NBIS", "cik": "0001513845", "metric": "capitalExpenditures",
+      "concept": "PaymentsToAcquirePropertyPlantAndEquipment", "value": 807500000,
+      "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "form": "20-F",
+      "accession": "0001104659-26-052948", "currency": "USD",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm"
+    }
+  ],
+  "operationScopeRegressions": [
+    {
+      "ticker": "NBIS", "cik": "0001513845", "period": "2023A",
+      "continuingCfo": -222000000, "totalIncludingDiscontinuedCfo": 829800000,
+      "operationScope": "CONTINUING_OPERATIONS", "form": "20-F",
+      "accession": "0001104659-26-052948",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm"
+    },
+    {
+      "ticker": "NBIS", "cik": "0001513845", "period": "2024A",
+      "continuingCfo": -269900000, "totalIncludingDiscontinuedCfo": 245600000,
+      "operationScope": "CONTINUING_OPERATIONS", "form": "20-F",
+      "accession": "0001104659-26-052948",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm"
+    },
+    {
+      "ticker": "NBIS", "cik": "0001513845", "period": "2025A",
+      "continuingCfo": 401900000, "totalIncludingDiscontinuedCfo": 384800000,
+      "operationScope": "CONTINUING_OPERATIONS", "form": "20-F",
+      "accession": "0001104659-26-052948",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm"
+    }
+  ],
+  "derivedAnnualRegressions": [
+    {
+      "ticker": "NBIS", "period": "2025A", "metric": "grossProfit",
+      "leftMetric": "revenue", "leftValue": 529800000,
+      "rightMetric": "costOfRevenue", "rightValue": 166200000,
+      "expectedValue": 363600000, "expectedClassification": "EXACT_DERIVED_CALENDAR_YEAR"
+    },
+    {
+      "ticker": "CRWV", "period": "2023A", "metric": "freeCashFlow",
+      "leftMetric": "operatingCashFlow", "leftValue": 1833000000,
+      "rightMetric": "capitalExpenditures", "rightValue": 2943000000,
+      "expectedValue": -1110000000, "expectedClassification": "EXACT_DERIVED_CALENDAR_YEAR",
+      "form": "10-K", "accession": "0001769628-26-000104",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1769628/000176962826000104/crwv-20251231.htm"
+    }
+  ],
+  "earningsExhibitRegressions": [
+    {
+      "ticker": "NBIS", "period": "Q2 2026", "metric": "revenue", "value": 582300000,
+      "periodEnd": "2026-06-30", "form": "6-K", "accession": "0001104659-26-094568",
+      "document": "tm2622968d1_ex99-1.htm",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1513845/000110465926094568/tm2622968d1_ex99-1.htm"
+    },
+    {
+      "ticker": "NBIS", "period": "Q2 2026", "metric": "capitalExpenditures", "value": 5657400000,
+      "periodEnd": "2026-06-30", "form": "6-K", "accession": "0001104659-26-094568",
+      "document": "tm2622968d1_ex99-1.htm",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1513845/000110465926094568/tm2622968d1_ex99-1.htm"
+    }
+  ]
+}

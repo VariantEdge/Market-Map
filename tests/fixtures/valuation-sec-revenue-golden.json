@@ -1,0 +1,101 @@
+{
+  "description": "Revenue values independently observed in SEC-filed company disclosures for Phase 5A regression only.",
+  "observations": [
+    {
+      "ticker": "BE",
+      "period": "Q2 2026",
+      "periodStart": "2026-04-01",
+      "periodEnd": "2026-06-30",
+      "value": 1065365000,
+      "currency": "USD",
+      "form": "10-Q/A",
+      "accession": "0001628280-26-050325",
+      "concept": "Revenues",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1664703/000162828026050325/be-20260630.htm"
+    },
+    {
+      "ticker": "CRWV",
+      "period": "Q2 2026",
+      "periodStart": "2026-04-01",
+      "periodEnd": "2026-06-30",
+      "value": 2575000000,
+      "currency": "USD",
+      "form": "10-Q",
+      "accession": "0001769628-26-000366",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1769628/000176962826000366/crwv-20260630.htm"
+    },
+    {
+      "ticker": "CRWV",
+      "period": "2023A",
+      "periodStart": "2023-01-01",
+      "periodEnd": "2023-12-31",
+      "value": 229000000,
+      "currency": "USD",
+      "form": "10-K",
+      "accession": "0001769628-26-000104",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1769628/000176962826000104/crwv-20251231.htm"
+    },
+    {
+      "ticker": "NBIS",
+      "period": "2024A",
+      "periodStart": "2024-01-01",
+      "periodEnd": "2024-12-31",
+      "value": 91500000,
+      "currency": "USD",
+      "form": "20-F",
+      "accession": "0001104659-26-052948",
+      "concept": "Revenues",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm"
+    },
+    {
+      "ticker": "NBIS",
+      "period": "2025A",
+      "periodStart": "2025-01-01",
+      "periodEnd": "2025-12-31",
+      "value": 529800000,
+      "currency": "USD",
+      "form": "20-F",
+      "accession": "0001104659-26-052948",
+      "concept": "Revenues",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm"
+    },
+    {
+      "ticker": "AMZN",
+      "period": "2024A",
+      "periodStart": "2024-01-01",
+      "periodEnd": "2024-12-31",
+      "value": 637959000000,
+      "currency": "USD",
+      "form": "10-K",
+      "accession": "0001018724-26-000004",
+      "concept": "SalesRevenueNet",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1018724/000101872426000004/amzn-20251231.htm"
+    },
+    {
+      "ticker": "GOOGL",
+      "period": "2024A",
+      "periodStart": "2024-01-01",
+      "periodEnd": "2024-12-31",
+      "value": 350018000000,
+      "currency": "USD",
+      "form": "10-K",
+      "accession": "0001652044-26-000018",
+      "concept": "Revenues",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000018/goog-20251231.htm"
+    },
+    {
+      "ticker": "META",
+      "period": "2024A",
+      "periodStart": "2024-01-01",
+      "periodEnd": "2024-12-31",
+      "value": 164501000000,
+      "currency": "USD",
+      "form": "10-K",
+      "accession": "0001628280-26-003942",
+      "concept": "Revenues",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1326801/000162828026003942/meta-20251231.htm"
+    }
+  ]
+}

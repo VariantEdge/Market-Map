@@ -14,13 +14,38 @@ export const VALIDATION_STATUS = Object.freeze({
   MISSING_BUT_AVAILABLE: 'MISSING_BUT_AVAILABLE',
   LEGITIMATE_NA: 'LEGITIMATE_NA',
   REQUIRES_REVIEW: 'REQUIRES_REVIEW',
+  INSUFFICIENT_PERIOD_COVERAGE: 'INSUFFICIENT_PERIOD_COVERAGE',
+  STALE_SOURCE_COVERAGE: 'STALE_SOURCE_COVERAGE',
+  OPERATION_SCOPE_INCOMPATIBLE: 'OPERATION_SCOPE_INCOMPATIBLE',
+  DEFINITION_INCOMPATIBLE: 'DEFINITION_INCOMPATIBLE',
   ETF_NOT_APPLICABLE: 'ETF_NOT_APPLICABLE',
   OUT_OF_SEC_SCOPE: 'OUT_OF_SEC_SCOPE',
+  ...HISTORICAL_RESULT_STATUS,
 })
 
 export const FORMULA_VERSION = 'valuation-audit-v1'
 
 const NUMERIC_TOLERANCE = 1e-9
+const CANONICAL_RESULT_STATUSES = new Set(Object.values(HISTORICAL_RESULT_STATUS))
+const ADJUSTED_EBITDA_NULL_STATUSES = new Set([...CANONICAL_RESULT_STATUSES].filter((status) =>
+  ![HISTORICAL_RESULT_STATUS.VERIFIED_REPORTED, HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED].includes(status)))
+const BASE_CANONICAL_HISTORICAL_METRICS = new Set([
+  'revenue', 'grossprofit', 'ebit', 'operatingcashflow', 'capitalexpenditures', 'freecashflow',
+])
+const DERIVED_OUTPUT_METRICS = new Set([
+  'ebit', 'evrevenue', 'evgrossprofit', 'evebit', 'evfreecashflow', 'evebitda',
+  'revenuegrowth', 'grossmargin', 'ebitdamargin',
+])
+
+function isBaseCanonicalHistoricalCell(metric, period) {
+  const normalizedMetric = String(metric ?? '').replaceAll(/[^a-z]/gi, '').toLowerCase()
+  return BASE_CANONICAL_HISTORICAL_METRICS.has(normalizedMetric) &&
+    (period === 'LTM' || /^\d{4}A$/.test(String(period)))
+}
+
+function isDerivedOutputMetric(metric) {
+  return DERIVED_OUTPUT_METRICS.has(String(metric ?? '').replaceAll(/[^a-z]/gi, '').toLowerCase())
+}
 
 function finite(value) {
   return value != null && Number.isFinite(Number(value))
@@ -96,13 +121,13 @@ function adjustedEbitdaValidation(source, requestedPeriodType, expectedDenominat
   return { passed: true, reason: null }
 }
 
-function chooseStatus({ source, sourceCheck, raw, calculation, manual }) {
+function chooseStatus({ source, sourceCheck, raw, calculation, manual, derivedOutput }) {
   if (!raw.passed || !sourceCheck.passed || !calculation.passed) return VALIDATION_STATUS.FAILED
   if (manual) return VALIDATION_STATUS.MANUAL
+  if (derivedOutput) return VALIDATION_STATUS.DERIVED
   const ledgerStatus = normalizedLedgerStatus(source?.validationStatus)
-  if ([VALIDATION_STATUS.EXACT, VALIDATION_STATUS.RECONSTRUCTED, VALIDATION_STATUS.DERIVED,
-    VALIDATION_STATUS.WARNING, VALIDATION_STATUS.MANUAL, VALIDATION_STATUS.VERIFIED_REPORTED,
-    VALIDATION_STATUS.VERIFIED_DERIVED, VALIDATION_STATUS.REQUIRES_REVIEW].includes(ledgerStatus)) {
+  if ([VALIDATION_STATUS.EXACT, VALIDATION_STATUS.RECONSTRUCTED,
+    VALIDATION_STATUS.WARNING, VALIDATION_STATUS.MANUAL].includes(ledgerStatus)) {
     return ledgerStatus
   }
   const type = sourceTypeFor(source)
@@ -132,15 +157,34 @@ export function createAuditRecord({
   const sourceCheck = canonicalAdjustedEbitda ?? sourceValidation(source, ticker)
   const rawCheck = rawValueValidation(value, { ...source, currency })
   const calculationCheck = calculationValidation(value, recomputed)
-  const status = finite(value)
-    ? chooseStatus({ source, sourceCheck, raw: rawCheck, calculation: calculationCheck, manual })
+  const adjustedEbitdaStatus = normalizedLedgerStatus(source?.validationStatus)
+  const preserveAdjustedEbitdaStatus = metric === 'ebitda' &&
+    (canonicalAdjustedEbitda?.passed || (!finite(value) && ADJUSTED_EBITDA_NULL_STATUSES.has(adjustedEbitdaStatus)))
+  const preserveBaseCanonicalStatus = canonicalAdjustedEbitda == null && isBaseCanonicalHistoricalCell(metric, period)
+  const canonicalStatus = (preserveBaseCanonicalStatus || preserveAdjustedEbitdaStatus) &&
+    CANONICAL_RESULT_STATUSES.has(normalizedLedgerStatus(source?.validationStatus))
+    ? normalizedLedgerStatus(source.validationStatus)
+    : null
+  const status = canonicalStatus ?? (finite(value)
+    ? chooseStatus({
+        source,
+        sourceCheck,
+        raw: rawCheck,
+        calculation: calculationCheck,
+        manual,
+        derivedOutput: isDerivedOutputMetric(metric),
+      })
     : [VALIDATION_STATUS.MISMATCH, VALIDATION_STATUS.FAILED].includes(source?.validationStatus)
       ? source.validationStatus
       : [VALIDATION_STATUS.MISSING_BUT_AVAILABLE, VALIDATION_STATUS.LEGITIMATE_NA,
         VALIDATION_STATUS.ETF_NOT_APPLICABLE, VALIDATION_STATUS.OUT_OF_SEC_SCOPE,
-        VALIDATION_STATUS.REQUIRES_REVIEW, VALIDATION_STATUS.UNAVAILABLE].includes(source?.validationStatus)
+        VALIDATION_STATUS.REQUIRES_REVIEW, VALIDATION_STATUS.INSUFFICIENT_PERIOD_COVERAGE,
+        VALIDATION_STATUS.STALE_SOURCE_COVERAGE, VALIDATION_STATUS.OPERATION_SCOPE_INCOMPATIBLE,
+        VALIDATION_STATUS.DEFINITION_INCOMPATIBLE, VALIDATION_STATUS.MISSING_SOURCE_DATA,
+        VALIDATION_STATUS.NOT_REPORTED, VALIDATION_STATUS.OUT_OF_SCOPE,
+        VALIDATION_STATUS.UNAVAILABLE].includes(source?.validationStatus)
         ? source.validationStatus
-        : VALIDATION_STATUS.UNVERIFIED
+        : VALIDATION_STATUS.UNVERIFIED)
   const allWarnings = [sourceCheck.reason, rawCheck.reason, calculationCheck.reason, ...(source?.warnings ?? []), ...warnings].filter(Boolean)
 
   return {
@@ -199,7 +243,23 @@ function metricSource(row, metric, period) {
   const entry = row.provenance?.[metric]?.[period]
   if (!entry) return { sourceType: 'Derived Calculation' }
   const component = entry?.components?.[0]
+  if (entry.status) {
+    const reported = entry.status === VALIDATION_STATUS.VERIFIED_REPORTED
+    return {
+      ...entry,
+      validationStatus: entry.status,
+      sourceType: reported ? 'SEC filed actual' : 'Derived Calculation',
+      sourceUrl: component?.sourceUrl ?? null,
+      filed: component?.filingDate ?? component?.filed ?? null,
+      accn: component?.accession ?? component?.accn ?? null,
+      warnings: [entry.reason, ...(entry.warnings ?? [])].filter(Boolean),
+      originalFiscalPeriod: component?.sourceStart
+        ? { start: component.sourceStart, end: component.sourceEnd }
+        : null,
+    }
+  }
   return entry?.sourceType ? entry : {
+    ...entry,
     sourceType: component?.sourceType ?? 'SEC filed actual',
     sourceUrl: entry?.sourceUrl ?? component?.sourceUrl ?? null,
     tag: entry?.tag ?? component?.tag ?? null,
@@ -281,7 +341,8 @@ export function buildRowAudit(row) {
   }
 
   for (const [metric, values] of Object.entries(row.multiples ?? {})) {
-    const denominatorMetric = metric === 'evRevenue' ? 'revenue' : metric === 'evGrossProfit' ? 'grossProfit' : metric === 'evEbitda' ? 'ebitda' : 'freeCashFlow'
+    const denominatorMetric = metric === 'evRevenue' ? 'revenue' : metric === 'evGrossProfit' ? 'grossProfit'
+      : metric === 'evEbit' ? 'ebit' : metric === 'evEbitda' ? 'ebitda' : 'freeCashFlow'
     for (const [period, value] of Object.entries(values ?? {})) {
       const denominator = metrics[denominatorMetric]?.[period]
       const recomputed = finite(row.capital?.enterpriseValue) && finite(denominator) && Number(denominator) > 0 ? Number(row.capital.enterpriseValue) / Number(denominator) : null
@@ -320,7 +381,10 @@ export function auditSummary(rows = []) {
     incompleteCompanies: rows.filter((row) => Object.values(row.audit?.cells ?? {}).some((record) => [
       VALIDATION_STATUS.UNAVAILABLE, VALIDATION_STATUS.UNVERIFIED, VALIDATION_STATUS.FAILED,
       VALIDATION_STATUS.MISMATCH, VALIDATION_STATUS.MISSING_BUT_AVAILABLE,
-      VALIDATION_STATUS.REQUIRES_REVIEW,
+      VALIDATION_STATUS.REQUIRES_REVIEW, VALIDATION_STATUS.INSUFFICIENT_PERIOD_COVERAGE,
+      VALIDATION_STATUS.STALE_SOURCE_COVERAGE, VALIDATION_STATUS.OPERATION_SCOPE_INCOMPATIBLE,
+      VALIDATION_STATUS.DEFINITION_INCOMPATIBLE, VALIDATION_STATUS.MISSING_SOURCE_DATA,
+      VALIDATION_STATUS.NOT_REPORTED, VALIDATION_STATUS.OUT_OF_SCOPE, VALIDATION_STATUS.LEGITIMATE_NA,
     ].includes(record.status))).map((row) => row.ticker),
     lastSuccessfulValidationRun: new Date().toISOString(),
   }
@@ -330,3 +394,4 @@ import {
   assertCanonicalAdjustedEbitdaEntry,
   ADJUSTED_EBITDA_PERIOD,
 } from './adjustedEbitdaEngine.js'
+import { HISTORICAL_RESULT_STATUS } from './historicalPeriodEngine.js'

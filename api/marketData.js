@@ -40,6 +40,7 @@ let externalNextStartAt = 0
 const externalQueue = []
 const memoryCache = new Map()
 const inFlight = new Map()
+let priceStoreUnavailableUntil = 0
 
 function getCachedValue(key) {
   const cached = memoryCache.get(key)
@@ -114,12 +115,14 @@ async function limitedFetch(url, options, attempt = 0) {
   return response
 }
 
-export function createSupabaseClient() {
+export function createSupabaseClient({ serviceRole = false } = {}) {
   const supabaseUrl = process.env.SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_ANON_KEY
+  const supabaseKey = serviceRole ? process.env.SUPABASE_SERVICE_ROLE_KEY : process.env.SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY')
+    throw new Error(serviceRole
+      ? 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+      : 'Missing SUPABASE_URL or SUPABASE_ANON_KEY')
   }
 
   return createClient(supabaseUrl, supabaseKey)
@@ -157,6 +160,7 @@ async function fetchYahooPriceFresh(ticker) {
   return {
     ticker: meta.symbol ?? ticker,
     price: meta.regularMarketPrice,
+    previousClose: meta.previousClose ?? meta.chartPreviousClose ?? null,
     currency: meta.currency ?? 'N/A',
     fetched_at: new Date().toISOString(),
   }
@@ -781,6 +785,48 @@ export async function getPrice(supabase, ticker) {
     currency: fresh.currency,
     fetchedAt: Date.now(),
   }
+}
+
+export async function getPrices(supabase, inputTickers, { refresh = false } = {}) {
+  const tickers = [...new Set(inputTickers.map((ticker) => String(ticker).trim().toUpperCase()).filter(Boolean))]
+  if (!tickers.length) return new Map()
+  const { data, error } = Date.now() < priceStoreUnavailableUntil
+    ? { data: [], error: null }
+    : await Promise.resolve(supabase.from('prices').select('ticker, price, currency, fetched_at').in('ticker', tickers))
+      .catch((storeError) => ({ data: [], error: storeError }))
+  if (error) priceStoreUnavailableUntil = Date.now() + CACHE_TTL_MS
+
+  const byTicker = new Map((data ?? []).map((row) => [String(row.ticker).toUpperCase(), row]))
+  const stale = tickers.filter((ticker) => {
+    const row = byTicker.get(ticker)
+    return refresh || !row || Date.now() - new Date(row.fetched_at).getTime() >= CACHE_TTL_MS
+  })
+  if (stale.length) {
+    const settled = await Promise.allSettled(stale.map((ticker) => fetchYahooPrice(ticker)))
+    const fresh = settled.filter((result) => result.status === 'fulfilled').map((result) => result.value)
+    if (fresh.length) {
+      if (Date.now() >= priceStoreUnavailableUntil) {
+        const { error: writeError } = await supabase.from('prices').upsert(fresh.map((row) => ({
+          ticker: row.ticker,
+          price: row.price,
+          currency: row.currency,
+          fetched_at: row.fetched_at,
+        })), { onConflict: 'ticker' })
+        if (writeError) priceStoreUnavailableUntil = Date.now() + CACHE_TTL_MS
+      }
+      for (const row of fresh) byTicker.set(String(row.ticker).toUpperCase(), row)
+    }
+  }
+  return new Map(tickers.map((ticker) => {
+    const row = byTicker.get(ticker)
+    return [ticker, row ? {
+      ticker,
+      price: row.price,
+      previousClose: row.previousClose ?? null,
+      currency: row.currency,
+      fetchedAt: new Date(row.fetched_at).getTime(),
+    } : null]
+  }))
 }
 
 export async function fetchAndStoreHistory(supabase, ticker) {

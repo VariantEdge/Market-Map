@@ -68,19 +68,38 @@ function secRateGapMs() {
 function runNextRequest() {
   if (activeRequests >= 1 || queue.length === 0) return
   const task = queue.shift()
+  if (task.signal?.aborted) {
+    task.reject(task.signal.reason ?? new DOMException('Aborted', 'AbortError'))
+    runNextRequest()
+    return
+  }
   const startAt = Math.max(now(), nextStartAt)
   const waitMs = Math.max(0, startAt - now())
   nextStartAt = startAt + secRateGapMs()
   activeRequests += 1
   setTimeout(() => {
+    if (task.signal?.aborted) {
+      activeRequests -= 1
+      task.reject(task.signal.reason ?? new DOMException('Aborted', 'AbortError'))
+      runNextRequest()
+      return
+    }
     task.start()
   }, waitMs)
 }
 
 function queuedFetch(url, options) {
   return new Promise((resolve, reject) => {
-    queue.push({
+    const signal = options?.signal
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    const task = {
+      signal,
+      reject,
       start: () => {
+        signal?.removeEventListener('abort', abortQueued)
         fetch(url, options)
           .then(resolve, reject)
           .finally(() => {
@@ -88,8 +107,53 @@ function queuedFetch(url, options) {
             runNextRequest()
           })
       },
-    })
+    }
+    const abortQueued = () => {
+      const index = queue.indexOf(task)
+      if (index < 0) return
+      queue.splice(index, 1)
+      signal.removeEventListener('abort', abortQueued)
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+    }
+    signal?.addEventListener('abort', abortQueued, { once: true })
+    queue.push(task)
     runNextRequest()
+  })
+}
+
+function abortError(error, signal) {
+  return signal?.aborted || error?.name === 'AbortError'
+}
+
+function linkedRequestController(signal, timeoutMs, message) {
+  const controller = new AbortController()
+  const relayAbort = () => controller.abort(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+  signal?.addEventListener('abort', relayAbort, { once: true })
+  const timeout = setTimeout(() => controller.abort(new Error(message)), timeoutMs)
+  return {
+    controller,
+    cleanup() {
+      clearTimeout(timeout)
+      signal?.removeEventListener('abort', relayAbort)
+    },
+  }
+}
+
+function abortableDelay(milliseconds, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', abort)
+      resolve()
+    }, milliseconds)
+    const abort = () => {
+      clearTimeout(timeout)
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+    }
+    signal?.addEventListener('abort', abort, { once: true })
   })
 }
 
@@ -105,8 +169,8 @@ async function secFetchJson(url, options = {}) {
   let lastError = null
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(new Error('SEC request timed out.')), timeoutMs)
+    if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError')
+    const request = linkedRequestController(options.signal, timeoutMs, 'SEC request timed out.')
     try {
       const response = await queuedFetch(url, {
         headers: {
@@ -114,12 +178,12 @@ async function secFetchJson(url, options = {}) {
           Accept: 'application/json',
           'Accept-Encoding': 'gzip, deflate, br',
         },
-        signal: controller.signal,
+        signal: request.controller.signal,
       })
-      clearTimeout(timeout)
+      request.cleanup()
 
       if ((response.status === 429 || response.status === 503) && attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, retryDelay(response, attempt)))
+        await abortableDelay(retryDelay(response, attempt), options.signal)
         continue
       }
       if (!response.ok) {
@@ -127,10 +191,11 @@ async function secFetchJson(url, options = {}) {
       }
       return response.json()
     } catch (error) {
-      clearTimeout(timeout)
+      request.cleanup()
+      if (abortError(error, options.signal)) throw error
       lastError = error
       if (attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, 500 * Math.pow(2, attempt)))
+        await abortableDelay(500 * Math.pow(2, attempt), options.signal)
         continue
       }
     }
@@ -248,8 +313,8 @@ export async function fetchSecText(url, options = {}) {
     let lastError = null
 
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(new Error('SEC filing request timed out.')), timeoutMs)
+      if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError')
+      const request = linkedRequestController(options.signal, timeoutMs, 'SEC filing request timed out.')
       try {
         const response = await queuedFetch(requestUrl, {
           headers: {
@@ -257,12 +322,12 @@ export async function fetchSecText(url, options = {}) {
             Accept: 'text/html,application/xhtml+xml,application/xml,text/plain;q=0.9,*/*;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br',
           },
-          signal: controller.signal,
+          signal: request.controller.signal,
         })
-        clearTimeout(timeout)
+        request.cleanup()
 
         if ((response.status === 429 || response.status === 503) && attempt < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, retryDelay(response, attempt)))
+          await abortableDelay(retryDelay(response, attempt), options.signal)
           continue
         }
         if (!response.ok) {
@@ -270,10 +335,11 @@ export async function fetchSecText(url, options = {}) {
         }
         return response.text()
       } catch (error) {
-        clearTimeout(timeout)
+        request.cleanup()
+        if (abortError(error, options.signal)) throw error
         lastError = error
         if (attempt < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, 500 * Math.pow(2, attempt)))
+          await abortableDelay(500 * Math.pow(2, attempt), options.signal)
           continue
         }
       }
@@ -289,4 +355,8 @@ export function clearSecCachesForTests() {
   queue.length = 0
   activeRequests = 0
   nextStartAt = 0
+}
+
+export function getSecRequestStateForTests() {
+  return { queued: queue.length, active: activeRequests, inFlight: inFlight.size }
 }

@@ -204,11 +204,10 @@ function parseDateHeader(value) {
   return isoDate(Number(match[3]), month, Number(match[2]))
 }
 
-function contextualPeriodEnd(context, year, filing) {
-  const match = normalizedCellText(context).match(/\b(?:three|six|nine|twelve) months ended\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})/i)
+function contextualPeriodEnd(context, year) {
+  const match = normalizedCellText(context).match(/\b(?:(?:three|six|nine|twelve) months|year) ended\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})/i)
   if (match) return parseDateHeader(`${match[1]} ${match[2]}, ${year}`)
-  const reportDate = String(filing?.reportDate ?? '')
-  return /^\d{4}-\d{2}-\d{2}$/.test(reportDate) ? `${year}${reportDate.slice(4)}` : null
+  return null
 }
 
 function periodFromHeaders(headers, company, filing, context = '') {
@@ -226,6 +225,8 @@ function periodFromHeaders(headers, company, filing, context = '') {
     return {
       type: 'QUARTER',
       basis: 'FISCAL_QUARTER',
+      dateAuthority: 'INFERRED',
+      explicitPeriodMapping: false,
       fiscalYear,
       fiscalQuarter: quarterNumber,
       ...range,
@@ -246,6 +247,10 @@ function periodFromHeaders(headers, company, filing, context = '') {
       return {
         type: calendarAnnual ? 'CALENDAR_YEAR' : duration.type,
         basis: calendarAnnual ? 'CALENDAR_YEAR' : duration.type,
+        dateAuthority: 'DERIVED_FROM_REPORTED_BOUNDARIES',
+        explicitPeriodMapping: true,
+        startEvidence: 'DERIVED_FROM_EXPLICIT_DURATION_AND_END',
+        endEvidence: 'EXPLICIT_TABLE_PERIOD_LABEL',
         startDate: shiftDate(shiftDate(endDate, { days: 1 }), { months: -duration.months }),
         endDate,
         fiscalYear: Number(endDate.slice(0, 4)),
@@ -258,7 +263,8 @@ function periodFromHeaders(headers, company, filing, context = '') {
   const explicitCalendar = combinedPlain.match(/\bCY\s*(20\d{2})\b/i)
   if (explicitCalendar) {
     const year = Number(explicitCalendar[1])
-    return { type: 'CALENDAR_YEAR', basis: 'CALENDAR_YEAR', startDate: `${year}-01-01`, endDate: `${year}-12-31`, calendarYear: year, sourceLabel: explicitCalendar[0] }
+    return { type: 'CALENDAR_YEAR', basis: 'CALENDAR_YEAR', dateAuthority: 'INFERRED', explicitPeriodMapping: false,
+      startDate: `${year}-01-01`, endDate: `${year}-12-31`, calendarYear: year, sourceLabel: explicitCalendar[0] }
   }
   const annual = combinedPlain.match(/(?:\bFY\s*)?\b(20\d{2})(?:A)?\b/i)
   if (!annual) return null
@@ -266,22 +272,31 @@ function periodFromHeaders(headers, company, filing, context = '') {
   const contextualDuration = /three months ended/i.test(context) ? { type: 'QUARTER', months: 3 }
     : /six months ended/i.test(context) ? { type: 'YTD_6M', months: 6 }
       : /nine months ended/i.test(context) ? { type: 'YTD_9M', months: 9 }
-        : null
+        : /(?:twelve months|year) ended/i.test(context) ? { type: 'FISCAL_YEAR', months: 12 }
+          : null
   if (contextualDuration) {
-    const contextualEnd = contextualPeriodEnd(context, year, filing)
+    const contextualEnd = contextualPeriodEnd(context, year)
     if (!contextualEnd) return null
+    const calendarAnnual = contextualDuration.type === 'FISCAL_YEAR' && contextualEnd.endsWith('-12-31')
     return {
-      type: contextualDuration.type,
-      basis: contextualDuration.type,
+      type: calendarAnnual ? 'CALENDAR_YEAR' : contextualDuration.type,
+      basis: calendarAnnual ? 'CALENDAR_YEAR' : contextualDuration.type,
+      dateAuthority: 'DERIVED_FROM_REPORTED_BOUNDARIES',
+      explicitPeriodMapping: true,
+      startEvidence: 'DERIVED_FROM_EXPLICIT_DURATION_AND_END',
+      endEvidence: 'EXPLICIT_TABLE_PERIOD_LABEL',
       startDate: shiftDate(shiftDate(contextualEnd, { days: 1 }), { months: -contextualDuration.months }),
       endDate: contextualEnd,
       fiscalYear: year,
+      calendarYear: calendarAnnual ? year : null,
       sourceLabel: `${contextualDuration.type}:${annual[0]}`,
     }
   }
-  if (fye === '1231') return { type: 'CALENDAR_YEAR', basis: 'CALENDAR_YEAR', startDate: `${year}-01-01`, endDate: `${year}-12-31`, calendarYear: year, fiscalYear: year, sourceLabel: annual[0] }
+  if (fye === '1231') return { type: 'CALENDAR_YEAR', basis: 'CALENDAR_YEAR', dateAuthority: 'INFERRED', explicitPeriodMapping: false,
+    startDate: `${year}-01-01`, endDate: `${year}-12-31`, calendarYear: year, fiscalYear: year, sourceLabel: annual[0] }
   const range = fiscalYearRange(year, fye)
-  return range ? { type: 'FISCAL_YEAR', basis: 'FISCAL_YEAR', fiscalYear: year, ...range, sourceLabel: annual[0] } : null
+  return range ? { type: 'FISCAL_YEAR', basis: 'FISCAL_YEAR', dateAuthority: 'INFERRED', explicitPeriodMapping: false,
+    fiscalYear: year, ...range, sourceLabel: annual[0] } : null
 }
 
 function definitionFingerprint(context, rowLabels) {
@@ -314,6 +329,23 @@ function nearbyTableContext($, table) {
     current = current.parent()
   }
   return normalizedCellText(parts.join(' ')).slice(-2_000)
+}
+
+function statementWideOperationScope($, table) {
+  const headings = [$(table).find('caption').first().text()]
+  let cursor = $(table).prev()
+  for (let index = 0; index < 3 && cursor.length; index += 1) {
+    const text = normalizedCellText(cursor.text())
+    const headingElement = cursor.is('h1,h2,h3,h4,h5,h6') ||
+      (text.length <= 200 && cursor.find('strong,b').length > 0)
+    if (headingElement) headings.unshift(text)
+    cursor = cursor.prev()
+  }
+  const heading = normalizedCellText(headings.join(' '))
+  const scopedHeading = /\b(?:continuing\s+operations.{0,80}(?:consolidated\s+)?(?:statements?\s+of\s+(?:income|operations|cash\s+flows?)|(?:financial\s+)?results)|(?:consolidated\s+)?(?:statements?\s+of\s+(?:income|operations|cash\s+flows?)|(?:financial\s+)?results).{0,80}continuing\s+operations)\b/i
+  return scopedHeading.test(heading)
+    ? 'continuing operations'
+    : null
 }
 
 function linkedEarningsExhibits(html, filing) {
@@ -560,7 +592,7 @@ export function extractStructuredNonGaapSlideFacts({ company, filing, html, sour
 }
 
 const STRUCTURED_FINANCIAL_METRICS = new Set([
-  'revenue', 'grossProfit', 'costOfRevenue', 'operatingCashFlow',
+  'revenue', 'grossProfit', 'costOfRevenue', 'ebit', 'operatingCashFlow',
   'capitalExpenditures', 'depreciationAmortization', 'depreciation', 'amortization',
 ])
 
@@ -585,7 +617,9 @@ export function extractStructuredFinancialTableFacts({
     const grid = tableGrid($, table)
     const context = nearbyTableContext($, table)
     const tableText = normalizedCellText($(table).text())
-    if (/\b(?:segment results|reportable segments|by segment|geographic information)\b/i.test(`${context} ${tableText}`)) return
+    const statementScopeEvidence = statementWideOperationScope($, table)
+    if (/\b(?:segment\s+results|reportable\s+segments|by\s+segment|segment\s+(?:adjusted\s+)?ebitda|other\s+segment|geographic\s+information)/i
+      .test(`${context} ${tableText}`)) return
 
     const rows = grid.map((row, rowIndex) => {
       const originCells = [...new Map((row ?? []).filter(Boolean)
@@ -650,6 +684,10 @@ export function extractStructuredFinancialTableFacts({
           durationDays,
           periodType: period.type,
           periodBasis: period.basis,
+          dateAuthority: period.dateAuthority ?? 'INFERRED',
+          explicitPeriodMapping: period.explicitPeriodMapping === true,
+          startEvidence: period.startEvidence ?? null,
+          endEvidence: period.endEvidence ?? null,
           period,
           fiscalYear: period.fiscalYear ?? null,
           fiscalPeriod: period.fiscalQuarter ? `Q${period.fiscalQuarter}` : period.type === 'FISCAL_YEAR' ? 'FY' : null,
@@ -667,6 +705,7 @@ export function extractStructuredFinancialTableFacts({
             rowIndex,
             columnIndex: item.cell.columnIndex,
             tableTitle: context || null,
+            statementScopeEvidence,
             rowLabel: labelCell.text,
             columnLabel: period.sourceLabel,
             rawCellValue: item.rawCellValue,
@@ -880,7 +919,7 @@ export function selectSupplementalFilings({ filingIndex, years, maxFilings = 20 
   ].map((filing) => [filing.accessionNumber, filing])).values()].slice(0, maxFilings)
 }
 
-export async function loadSupplementalFilingFacts({ company, filingIndex, years, maxFilings = 20 }) {
+export async function loadSupplementalFilingFacts({ company, filingIndex, years, maxFilings = 20, signal }) {
   const sourceCompany = {
     ...company,
     fiscalYearEnd: filingIndex?.company?.fiscalYearEnd ?? company?.fiscalYearEnd ?? null,
@@ -889,27 +928,31 @@ export async function loadSupplementalFilingFacts({ company, filingIndex, years,
   const records = []
   const errors = []
   for (const filing of candidates) {
+    signal?.throwIfAborted()
     try {
-      const html = await fetchSecText(filing.filingUrl)
+      const html = await fetchSecText(filing.filingUrl, { signal })
       records.push(...extractInlineXbrlFacts({ company: sourceCompany, filing, html }))
       records.push(...extractStructuredFinancialTableFacts({ company: sourceCompany, filing, html }))
-      const hydrated = await hydrateFilingExhibits(filing)
+      const hydrated = await hydrateFilingExhibits(filing, { signal })
       records.push(...extractStructuredNonGaapTableFacts({ company: sourceCompany, filing, html }))
       records.push(...extractStructuredNonGaapSlideFacts({ company: sourceCompany, filing, html }))
       const linked = linkedEarningsExhibits(html, filing)
       const exhibits = [...new Map([...hydrated.exhibits, ...linked].map((item) => [item.url, item])).values()]
       for (const exhibit of exhibits.filter((item) => item.isLikelyEarningsExhibit && /\.html?$/i.test(item.name)).slice(0, 4)) {
-        const exhibitHtml = await fetchSecText(exhibit.url)
+        signal?.throwIfAborted()
+        const exhibitHtml = await fetchSecText(exhibit.url, { signal })
         records.push(...extractStructuredFinancialTableFacts({ company: sourceCompany, filing, html: exhibitHtml, sourceUrl: exhibit.url }))
         records.push(...extractStructuredNonGaapTableFacts({ company: sourceCompany, filing, html: exhibitHtml, sourceUrl: exhibit.url }))
         records.push(...extractStructuredNonGaapSlideFacts({ company: sourceCompany, filing, html: exhibitHtml, sourceUrl: exhibit.url }))
       }
       const instanceDocuments = hydrated.exhibits.filter(likelyXbrlInstance).slice(0, 2)
       for (const instance of instanceDocuments) {
-        const xml = await fetchSecText(instance.url)
+        signal?.throwIfAborted()
+        const xml = await fetchSecText(instance.url, { signal })
         records.push(...extractXbrlInstanceFacts({ company: sourceCompany, filing, xml, sourceUrl: instance.url }))
       }
     } catch (error) {
+      if (signal?.aborted) throw error
       errors.push({ accessionNumber: filing.accessionNumber, error: error.message })
     }
   }

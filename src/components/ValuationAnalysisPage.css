@@ -122,7 +122,10 @@
 .valuation-table tbody tr:hover .valuation-company button { opacity: 1; }
 .valuation-company button:hover { background: rgba(236, 98, 114, .15); color: #ffb2bb; }
 .valuation-empty { height: 160px !important; color: var(--va-muted) !important; text-align: center !important; }
-.valuation-loading-row td:not(.valuation-frozen) span { color: var(--va-muted); opacity: 0.55; }
+.valuation-cell-skeleton { display: inline-block; width: min(54px, 78%); height: 8px; border-radius: 2px; background: linear-gradient(90deg, rgba(93, 113, 135, .22), rgba(141, 160, 180, .55), rgba(93, 113, 135, .22)); background-size: 200% 100%; animation: valuation-skeleton 1.2s ease-in-out infinite; }
+.valuation-cell-error { color: var(--va-negative); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+@keyframes valuation-skeleton { from { background-position: 180% 0; } to { background-position: -20% 0; } }
+@media (prefers-reduced-motion: reduce) { .valuation-cell-skeleton { animation: none; } }
 .valuation-note { margin: 8px 1px 0; color: var(--va-faint); font-size: 10px; line-height: 1.45; }
 
 .valuation-source-drawer { position: fixed; z-index: 60; top: 0; right: 0; bottom: 0; width: min(420px, 92vw); overflow: auto; padding: 22px; border-left: 1px solid var(--va-border-strong); background: #0b141f; box-shadow: -24px 0 60px rgba(0, 0, 0, .42); }

@@ -240,7 +240,18 @@ function quarterRecord(company, fact) {
   }
 }
 
-function unavailable(reason, components = []) {
+function unavailableStatus(reason, components, evidenceExists) {
+  if (reason === 'DEFINITION_INCOMPATIBLE') return 'DEFINITION_INCOMPATIBLE'
+  if (reason === 'CURRENCY_INCOMPATIBLE') return HISTORICAL_VALIDATION_STATUS.REQUIRES_REVIEW
+  if (/UNAVAILABLE|NOT_CONTIGUOUS/.test(reason)) {
+    return evidenceExists || components.length
+      ? 'INSUFFICIENT_PERIOD_COVERAGE'
+      : 'NOT_REPORTED'
+  }
+  return 'MISSING_SOURCE_DATA'
+}
+
+function unavailable(reason, components = [], evidenceExists = components.length > 0) {
   return {
     value: null,
     components,
@@ -249,7 +260,7 @@ function unavailable(reason, components = []) {
     confidence: null,
     definition: 'Company-defined Adjusted EBITDA',
     exactness: null,
-    validationStatus: HISTORICAL_VALIDATION_STATUS.LEGITIMATE_NA,
+    validationStatus: unavailableStatus(reason, components, evidenceExists),
     method: reason,
     adjustedEbitdaMethod: null,
     warnings: [reason],
@@ -292,7 +303,9 @@ function derivedCalendarYearEntry(year, facts) {
     const expected = expectedCalendarQuarterRange(year, quarter)
     const matches = facts.filter((fact) => fact.periodType === ADJUSTED_EBITDA_PERIOD.QUARTER &&
       fact.startDate === expected.startDate && fact.endDate === expected.endDate)
-    if (matches.length !== 1) return unavailable('FOUR_EXACT_CALENDAR_QUARTERS_UNAVAILABLE', matches.map(component))
+    if (matches.length !== 1) {
+      return unavailable('FOUR_EXACT_CALENDAR_QUARTERS_UNAVAILABLE', matches.map(component), facts.length > 0)
+    }
     quarters.push(matches[0])
   }
   const currencies = new Set(quarters.map((fact) => fact.currency))
@@ -326,7 +339,9 @@ function ltmEntry(facts) {
   const quarters = facts.filter((fact) => fact.periodType === ADJUSTED_EBITDA_PERIOD.QUARTER)
     .sort((left, right) => left.endDate.localeCompare(right.endDate))
     .slice(-4)
-  if (quarters.length !== 4) return unavailable('FOUR_STANDALONE_QUARTERS_UNAVAILABLE', quarters.map(component))
+  if (quarters.length !== 4) {
+    return unavailable('FOUR_STANDALONE_QUARTERS_UNAVAILABLE', quarters.map(component), facts.length > 0)
+  }
   if (!isContiguous(quarters)) return unavailable('LTM_QUARTERS_NOT_CONTIGUOUS', quarters.map(component))
   if (!definitionsCompatible(quarters)) {
     return unavailable('DEFINITION_INCOMPATIBLE', quarters.map(component))
