@@ -3,6 +3,7 @@ import { HISTORICAL_VALIDATION_STATUS } from './issuerClassification.js'
 import { createHash } from 'node:crypto'
 
 const DAY_MS = 24 * 60 * 60 * 1000
+export const ADJUSTED_EBITDA_ENGINE_VERSION = 'company-defined-adjusted-ebitda-v2-ltm'
 const ALLOWED_FORMS = new Set([
   '10-K', '10-K/A', '10-Q', '10-Q/A', '8-K', '8-K/A',
   '20-F', '20-F/A', '40-F', '40-F/A', '6-K',
@@ -228,7 +229,11 @@ export function adjustedEbitdaDenominatorIdentity(entry) {
 }
 
 function withDenominatorIdentity(entry) {
-  return { ...entry, denominatorIdentity: adjustedEbitdaDenominatorIdentity(entry) }
+  return {
+    ...entry,
+    adjustedEbitdaEngineVersion: ADJUSTED_EBITDA_ENGINE_VERSION,
+    denominatorIdentity: adjustedEbitdaDenominatorIdentity(entry),
+  }
 }
 
 function quarterRecord(company, fact) {
@@ -268,6 +273,7 @@ function quarterRecord(company, fact) {
     exactness: 'REPORTED',
     validationStatus: HISTORICAL_VALIDATION_STATUS.VERIFIED_REPORTED,
     adjustedEbitdaMethod: ADJUSTED_EBITDA_METHOD.COMPANY_REPORTED,
+    adjustedEbitdaEngineVersion: ADJUSTED_EBITDA_ENGINE_VERSION,
     definitionFingerprint: fact.definitionFingerprint,
     calculationLineage: {
       method: ADJUSTED_EBITDA_METHOD.COMPANY_REPORTED,
@@ -302,6 +308,7 @@ function unavailable(reason, components = [], evidenceExists = components.length
     validationStatus: unavailableStatus(reason, components, evidenceExists),
     method: reason,
     adjustedEbitdaMethod: null,
+    adjustedEbitdaEngineVersion: ADJUSTED_EBITDA_ENGINE_VERSION,
     warnings: [reason],
   }
 }
@@ -536,6 +543,7 @@ export function buildCanonicalAdjustedEbitda({ company, rawLedger, years }) {
     return [year, direct ? directCalendarYearEntry(direct) : derivedCalendarYearEntry(year, selected)]
   }))
   return {
+    engineVersion: ADJUSTED_EBITDA_ENGINE_VERSION,
     quarters,
     calendarActuals,
     ltm: ltmEntry(selected),

@@ -7,6 +7,7 @@ import {
   hasCompleteAuditedAdjustedEbitda,
   loadAdjustedEbitdaProductionTask,
   loadLegacyForwardBasisProductionTask,
+  loadSupplementalProductionTask,
 } from '../api/valuationData.js'
 import { extractStructuredNonGaapTableFacts } from '../server/valuation/filingFactExtractor.js'
 import { buildCanonicalAdjustedEbitda } from '../server/valuation/adjustedEbitdaEngine.js'
@@ -133,6 +134,24 @@ test('audited GAAP presence does not suppress supplemental Adjusted EBITDA', asy
   })
   assert.equal(supplementalLoads, 1)
   assert.deepEqual(result.ledger.supplementalRawFacts, [])
+})
+
+test('explicit Adjusted EBITDA refresh bypasses stale supplemental cache exactly once', async () => {
+  let cacheReads = 0
+  let supplementalLoads = 0
+  const result = await loadSupplementalProductionTask({
+    company: { ticker: 'SYNTH', cik: '1' }, filingIndex: { filings: [] }, years: [2025],
+    skipSupplemental: false, refresh: true,
+  }, {
+    loadCached: async () => { cacheReads += 1; return { records: [{ sourceId: 'stale' }], errors: [] } },
+    loadSupplemental: async () => {
+      supplementalLoads += 1
+      return { records: [{ sourceId: 'fresh' }], errors: [], filingsExamined: 4 }
+    },
+  })
+  assert.equal(cacheReads, 0)
+  assert.equal(supplementalLoads, 1)
+  assert.equal(result.records[0].sourceId, 'fresh')
 })
 
 test('complete audited Adjusted EBITDA coverage is the only valid supplemental skip condition', () => {

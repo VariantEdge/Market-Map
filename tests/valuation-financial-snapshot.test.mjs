@@ -9,6 +9,7 @@ import { classifyAdjustedEbitdaSnapshotHealth, classifyFinancialSnapshot, create
   VALUATION_FINANCIAL_ENGINE_VERSION } from '../server/valuation/financialSnapshot.js'
 import { snapshotFinancialRow } from '../server/valuation/financialSnapshot.js'
 import { refreshAndVerifyAdjustedEbitdaSnapshot } from '../server/valuation/adjustedEbitdaSnapshotBackfill.js'
+import { ADJUSTED_EBITDA_ENGINE_VERSION } from '../server/valuation/adjustedEbitdaEngine.js'
 
 const ACTUAL_YEARS = [2023, 2024, 2025]
 
@@ -86,7 +87,7 @@ function financialRow(ticker, revenue = 100) {
       components: [],
     }]))]))
   return {
-    ticker, name: ticker, currency: 'USD',
+    ticker, name: ticker, currency: 'USD', adjustedEbitdaEngineVersion: ADJUSTED_EBITDA_ENGINE_VERSION,
     capital: { dilutedShares: 10, debt: 5, cash: 2, equityValue: 0, enterpriseValue: 0 },
     metrics: {
       revenue: periods,

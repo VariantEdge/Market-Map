@@ -1,4 +1,5 @@
 import {
+  ADJUSTED_EBITDA_ENGINE_VERSION,
   ADJUSTED_EBITDA_PERIOD,
   adjustedEbitdaDenominatorIdentity,
   assertCanonicalAdjustedEbitdaEntry,
@@ -74,6 +75,12 @@ function validCurrentAdjustedEbitdaLtm(snapshot) {
   } catch {
     return false
   }
+}
+
+function adjustedEbitdaEngineVersion(snapshot) {
+  return snapshot?.provenance?.ebitda?.LTM?.adjustedEbitdaEngineVersion ??
+    snapshot?.adjustedEbitdaEngineVersion ??
+    snapshot?.financialSnapshot?.adjustedEbitdaEngineVersion ?? null
 }
 
 function reconstructedLtmBoundaries(entry) {
@@ -310,6 +317,7 @@ export function classifyAdjustedEbitdaSnapshotHealth(snapshot, actualYears) {
       if (period === 'LTM') return !validCurrentAdjustedEbitdaLtm(snapshot)
       return false
     }
+    if (period === 'LTM' && adjustedEbitdaEngineVersion(snapshot) !== ADJUSTED_EBITDA_ENGINE_VERSION) return true
     return !EBITDA_LEGITIMATE_NULL_STATUSES.has(status) || EBITDA_REPAIR_STATUSES.has(status)
   })
   return {
@@ -382,6 +390,7 @@ export async function loadFinancialSnapshots(supabase, tickers, options = {}) {
           engineVersion: record.engine_version, actualYears: classification.actualYears,
           updatedAt: record.updated_at, state: classification.state, reasons: classification.reasons,
           ageMs: classification.ageMs,
+          adjustedEbitdaEngineVersion: adjustedEbitdaEngineVersion(record.snapshot),
         },
       }]
     })),
@@ -400,6 +409,7 @@ export async function saveFinancialSnapshot(supabase, ticker, snapshot, options 
     ? FINANCIAL_SNAPSHOT_STATE.STALE : FINANCIAL_SNAPSHOT_STATE.READY
   const reasons = ebitdaHealth.reason ? [ebitdaHealth.reason] : []
   const ageMs = Math.max(0, Date.now() - Date.parse(updatedAt))
+  const ebitdaEngineVersion = adjustedEbitdaEngineVersion(snapshot)
   const record = {
     ticker: normalizeTicker(ticker),
     engine_version: engineVersion,
@@ -407,7 +417,10 @@ export async function saveFinancialSnapshot(supabase, ticker, snapshot, options 
     snapshot: {
       ...snapshot,
       actualYears,
-      financialSnapshot: { engineVersion, actualYears, updatedAt, state: storedState, reasons, ageMs },
+      financialSnapshot: {
+        engineVersion, actualYears, updatedAt, state: storedState, reasons, ageMs,
+        adjustedEbitdaEngineVersion: ebitdaEngineVersion,
+      },
     },
     updated_at: updatedAt,
   }
@@ -427,6 +440,7 @@ export async function saveFinancialSnapshot(supabase, ticker, snapshot, options 
       state: storedState,
       reasons,
       ageMs,
+      adjustedEbitdaEngineVersion: ebitdaEngineVersion,
     },
   }
 }
@@ -441,6 +455,8 @@ export function snapshotFinancialRow(row) {
   delete snapshot.marketTimestamp
   delete snapshot.refreshing
   if (snapshot.provenance) delete snapshot.provenance.market
+  const ebitdaEngineVersion = snapshot.provenance?.ebitda?.LTM?.adjustedEbitdaEngineVersion
+  if (ebitdaEngineVersion) snapshot.adjustedEbitdaEngineVersion = ebitdaEngineVersion
   snapshot.forwardBasisInputs = structuredClone(row.forwardBasisInputs ?? snapshot.forwardBasisInputs ?? null)
   return snapshot
 }
@@ -478,8 +494,12 @@ export function createMemoryFinancialSnapshotRepository() {
     async save(_supabase, ticker, snapshot, options = {}) {
       const actualYears = normalizedYears(options.actualYears ?? snapshot.actualYears ?? snapshot.financialSnapshot?.actualYears)
       const updatedAt = options.updatedAt ?? new Date().toISOString()
-      const state = Date.now() - Date.parse(updatedAt) > (options.staleAfterMs ?? VALUATION_FINANCIAL_SNAPSHOT_STALE_MS)
+      const ebitdaHealth = classifyAdjustedEbitdaSnapshotHealth(snapshot, actualYears)
+      const state = Date.now() - Date.parse(updatedAt) > (options.staleAfterMs ?? VALUATION_FINANCIAL_SNAPSHOT_STALE_MS) ||
+        ebitdaHealth.state === 'REPAIR_REQUIRED'
         ? FINANCIAL_SNAPSHOT_STATE.STALE : FINANCIAL_SNAPSHOT_STATE.READY
+      const reasons = ebitdaHealth.reason ? [ebitdaHealth.reason] : []
+      const ebitdaEngineVersion = adjustedEbitdaEngineVersion(snapshot)
       const value = {
         ...structuredClone(snapshot),
         ticker: normalizeTicker(ticker),
@@ -489,8 +509,9 @@ export function createMemoryFinancialSnapshotRepository() {
           actualYears,
           updatedAt,
           state,
-          reasons: [],
+          reasons,
           ageMs: Math.max(0, Date.now() - Date.parse(updatedAt)),
+          adjustedEbitdaEngineVersion: ebitdaEngineVersion,
         },
       }
       values.set(value.ticker, value)

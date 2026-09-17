@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getValuationRows } from '../api/valuationData.js'
 import {
+  ADJUSTED_EBITDA_ENGINE_VERSION,
   ADJUSTED_EBITDA_PERIOD,
   adjustedEbitdaDenominatorIdentity,
   assertCanonicalAdjustedEbitdaEntry,
@@ -12,10 +13,11 @@ import {
   classifyAdjustedEbitdaSnapshotHealth,
   classifyFinancialSnapshot,
   createMemoryFinancialSnapshotRepository,
+  evaluateFinancialSnapshotPromotion,
   migrateAdjustedEbitdaLtmSnapshotRecord,
 } from '../server/valuation/financialSnapshot.js'
 import { buildRowAudit } from '../server/valuation/validation.js'
-import { financialSnapshotNeedsRefresh } from '../src/components/valuationRefreshSequence.js'
+import { financialSnapshotNeedsRefresh, runValuationRefreshSequence } from '../src/components/valuationRefreshSequence.js'
 
 const ACTUAL_YEARS = [2023, 2024, 2025]
 const company = { ticker: 'SYNTH', name: 'Synthetic Corp.', cik: '0000000001' }
@@ -125,6 +127,23 @@ function legacySnapshot(rawLedger) {
   return snapshot
 }
 
+function legacyNullSnapshot(status = 'INSUFFICIENT_PERIOD_COVERAGE') {
+  const snapshot = snapshotFor(directLedger())
+  snapshot.metrics.ebitda.LTM = null
+  snapshot.provenance.ebitda.LTM = {
+    value: null,
+    components: [],
+    sourceType: 'Unavailable',
+    validationStatus: status,
+    method: status,
+    warnings: [status],
+  }
+  snapshot.multipleDenominatorIdentity.evEbitda.LTM = null
+  delete snapshot.adjustedEbitdaEngineVersion
+  delete snapshot.financialSnapshot.adjustedEbitdaEngineVersion
+  return snapshot
+}
+
 function recordFor(snapshot) {
   return {
     ticker: snapshot.ticker,
@@ -231,4 +250,104 @@ test('persisted migrated identity is accepted by row audit and EV-to-Adjusted-EB
   assert.equal(audit.cells['evEbitda:LTM'].checks.canonicalAdjustedEbitda.passed, true)
   assert.equal(snapshot.multipleDenominatorIdentity.evEbitda.LTM,
     snapshot.provenance.ebitda.LTM.denominatorIdentity)
+})
+
+test('legacy null LTM statuses without the current domain version require repair', () => {
+  for (const status of ['INSUFFICIENT_PERIOD_COVERAGE', 'NOT_REPORTED', 'DEFINITION_INCOMPATIBLE', 'REQUIRES_REVIEW']) {
+    const snapshot = legacyNullSnapshot(status)
+    const health = classifyAdjustedEbitdaSnapshotHealth(snapshot, ACTUAL_YEARS)
+    assert.equal(health.state, 'REPAIR_REQUIRED', status)
+    assert.deepEqual(health.affected, ['LTM'], status)
+    assert.equal(classifyFinancialSnapshot(recordFor(snapshot), ACTUAL_YEARS).state, 'STALE', status)
+  }
+})
+
+test('controlled refresh replaces a legacy LTM N/A once, stamps the domain version, and preserves annuals', async () => {
+  const repository = createMemoryFinancialSnapshotRepository()
+  const legacy = legacyNullSnapshot('INSUFFICIENT_PERIOD_COVERAGE')
+  const fresh = snapshotFor(directLedger())
+  const annualMetrics = structuredClone(Object.fromEntries(Object.entries(legacy.metrics.ebitda)
+    .filter(([period]) => period.endsWith('A'))))
+  const annualProvenance = structuredClone(Object.fromEntries(Object.entries(legacy.provenance.ebitda)
+    .filter(([period]) => period.endsWith('A'))))
+  repository.seed('SYNTH', legacy)
+  const marketLoader = async () => new Map([['SYNTH', {
+    ticker: 'SYNTH', price: 49, previousClose: 48, currency: 'USD', fetchedAt: Date.now(),
+  }]])
+  let financialRuns = 0
+  let providerCalls = 0
+  const initial = await getValuationRows(null, ['SYNTH'], {
+    snapshotRepository: repository,
+    marketLoader,
+    profileCacheKey: `legacy-null-initial-${Date.now()}-${Math.random()}`,
+  })
+  assert.equal(initial.rows[0].financialSnapshot.state, 'STALE')
+
+  const refreshedRow = await runValuationRefreshSequence(initial.rows[0], {
+    financial: async () => {
+      financialRuns += 1
+      const response = await getValuationRows(null, ['SYNTH'], {
+        financialRefresh: true,
+        snapshotRepository: repository,
+        marketLoader,
+        providerLoader: async () => { providerCalls += 1; return { value: [] } },
+        financialRowBuilder: async () => structuredClone(fresh),
+        profileCacheKey: `legacy-null-refresh-${Date.now()}-${Math.random()}`,
+      })
+      return response.rows[0]
+    },
+    consensus: async (row) => row,
+  })
+  assert.equal(financialRuns, 1)
+  assert.equal(providerCalls, 1)
+  assert.equal(refreshedRow.metrics.ebitda.LTM, 120_000_000)
+  assert.equal(refreshedRow.provenance.ebitda.LTM.adjustedEbitdaEngineVersion,
+    ADJUSTED_EBITDA_ENGINE_VERSION)
+  assert.equal(refreshedRow.financialSnapshot.state, 'READY')
+
+  const reloaded = await getValuationRows(null, ['SYNTH'], {
+    snapshotRepository: repository,
+    marketLoader,
+    profileCacheKey: `legacy-null-reload-${Date.now()}-${Math.random()}`,
+  })
+  await runValuationRefreshSequence(reloaded.rows[0], {
+    financial: async () => { financialRuns += 1; throw new Error('Unexpected second financial refresh') },
+    consensus: async (row) => row,
+  })
+  assert.equal(financialRuns, 1)
+  assert.equal(reloaded.rows[0].financialSnapshot.state, 'READY')
+  const persisted = (await repository.load(null, ['SYNTH'], { actualYears: ACTUAL_YEARS })).snapshots.get('SYNTH')
+  assert.deepEqual(Object.fromEntries(Object.entries(persisted.metrics.ebitda)
+    .filter(([period]) => period.endsWith('A'))), annualMetrics)
+  assert.deepEqual(Object.fromEntries(Object.entries(persisted.provenance.ebitda)
+    .filter(([period]) => period.endsWith('A'))), annualProvenance)
+})
+
+test('current-engine legitimate LTM N/A is healthy and does not queue a rebuild', () => {
+  const snapshot = snapshotFor([])
+  assert.equal(snapshot.metrics.ebitda.LTM, null)
+  assert.equal(snapshot.provenance.ebitda.LTM.adjustedEbitdaEngineVersion,
+    ADJUSTED_EBITDA_ENGINE_VERSION)
+  const classification = classifyFinancialSnapshot(recordFor(snapshot), ACTUAL_YEARS)
+  assert.equal(classification.state, 'READY')
+  assert.equal(financialSnapshotNeedsRefresh({ financialSnapshot: classification }), false)
+})
+
+test('source outage cannot destroy a previously verified LTM value', () => {
+  const existing = snapshotFor(directLedger())
+  existing.financialSnapshot.updatedAt = '2026-09-16T00:00:00.000Z'
+  const candidate = structuredClone(existing)
+  candidate.metrics.ebitda.LTM = null
+  candidate.provenance.ebitda.LTM = {
+    value: null,
+    validationStatus: 'MISSING_SOURCE_DATA',
+    method: 'ADJUSTED_EBITDA_EXTRACTION_TIMEOUT',
+    components: [],
+  }
+  const promotion = evaluateFinancialSnapshotPromotion(existing, candidate, { actualYears: ACTUAL_YEARS })
+  assert.equal(promotion.accepted, false)
+  assert.equal(promotion.snapshot.metrics.ebitda.LTM, 120_000_000)
+  assert.equal(promotion.snapshot.provenance.ebitda.LTM.denominatorIdentity,
+    existing.provenance.ebitda.LTM.denominatorIdentity)
+  assert.equal(promotion.snapshot.financialSnapshot.updatedAt, '2026-09-16T00:00:00.000Z')
 })

@@ -391,7 +391,7 @@ export async function loadSupplementalProductionTask(input, dependencies = {}, t
   const loadCached = dependencies.loadCached ?? loadLatestSupplementalSourceFacts
   const loadSupplemental = dependencies.loadSupplemental ?? loadSupplementalFilingFacts
   const result = await runAbortableTask('SUPPLEMENTAL_SEC_EXTRACTION', async (signal) => {
-    const cached = await loadCached(input.company).catch(() => null)
+    const cached = input.refresh ? null : await loadCached(input.company).catch(() => null)
     if (cached) return cached
     return loadSupplemental({
       company: input.company,
@@ -425,6 +425,8 @@ export async function loadAdjustedEbitdaProductionTask(input, dependencies = {},
     const cachedSupplemental = input.preloadedSupplemental !== undefined
       ? null
       : input.skipSupplemental
+      ? null
+      : input.refresh
       ? null
       : await loadCached(input.company).catch(() => null)
     const supplemental = input.preloadedSupplemental !== undefined
@@ -592,6 +594,7 @@ export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows 
   const supplementalPromise = needsSupplemental
     ? measureLatency(profile, 'supplementalSec', () => loadSupplementalProductionTask({
         company, filingIndex, years: years.actual, skipSupplemental: false,
+        refresh: Boolean(options.refreshAdjustedEbitda),
       }, options.supplementalDependencies ?? {}, SEC_SOURCE_TIMEOUT_MS))
     : Promise.resolve({ records: [], errors: [], failure: null })
   const adjustedLoader = () => measureLatency(profile, 'adjustedEbitda', () => loadAdjustedEbitdaProductionTask({
@@ -601,6 +604,7 @@ export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows 
     filingIndex,
     skipSupplemental: !operatingCompany || auditedAdjustedEbitdaComplete,
     preloadedSupplemental: needsSupplemental && !auditedAdjustedEbitdaComplete ? supplementalPromise : undefined,
+    refresh: Boolean(options.refreshAdjustedEbitda),
     fallbackStatus: issuerClassification.financialStatus ?? HISTORICAL_VALIDATION_STATUS.MISSING_BUT_AVAILABLE,
   }, options.adjustedEbitdaDependencies ?? {}))
   const adjustedPromise = company && facts
@@ -819,6 +823,8 @@ export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows 
     name: company?.name ?? ticker,
     cik: company?.cik ?? null,
     issuerClassification,
+    adjustedEbitdaEngineVersion: ltmEbitda?.adjustedEbitdaEngineVersion ??
+      historicalLedger?.adjustedEbitda?.engineVersion ?? null,
     filingExtraction: { filingsExamined: supplemental.filingsExamined ?? 0, errors: supplemental.errors },
     currency: quote?.currency ?? fundamentals?.currency ?? 'USD',
     price: quote?.price ?? null,
