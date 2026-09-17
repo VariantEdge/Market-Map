@@ -1,3 +1,9 @@
+import {
+  ADJUSTED_EBITDA_PERIOD,
+  adjustedEbitdaDenominatorIdentity,
+  assertCanonicalAdjustedEbitdaEntry,
+} from './adjustedEbitdaEngine.js'
+
 export const VALUATION_FINANCIAL_SNAPSHOT_TABLE = 'valuation_financial_snapshots'
 export const VALUATION_FINANCIAL_ENGINE_VERSION = 'canonical-financials-v3-ebit-forward-basis'
 export const PREVIOUS_VALUATION_FINANCIAL_ENGINE_VERSION = 'canonical-financials-v2-ebit'
@@ -47,6 +53,91 @@ function finite(value) {
 
 function validCanonicalLtmRevenue(entry) {
   return finite(entry?.value) && VERIFIED_CANONICAL_STATUSES.has(canonicalStatus(entry))
+}
+
+function nextDate(value) {
+  const parsed = Date.parse(`${value}T12:00:00Z`)
+  if (!Number.isFinite(parsed)) return null
+  const date = new Date(parsed)
+  date.setUTCDate(date.getUTCDate() + 1)
+  return date.toISOString().slice(0, 10)
+}
+
+function validCurrentAdjustedEbitdaLtm(snapshot) {
+  const entry = snapshot?.provenance?.ebitda?.LTM
+  const metricValue = snapshot?.metrics?.ebitda?.LTM
+  if (!finite(metricValue) || !finite(entry?.value) || Number(metricValue) !== Number(entry.value) ||
+      !VERIFIED_CANONICAL_STATUSES.has(canonicalStatus(entry))) return false
+  try {
+    assertCanonicalAdjustedEbitdaEntry(entry, ADJUSTED_EBITDA_PERIOD.LTM)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function reconstructedLtmBoundaries(entry) {
+  const components = entry?.components
+  if (!Array.isArray(components)) return null
+  if (entry.derivation === 'DIRECT_REPORTED_LTM' && components.length === 1) {
+    return { ltmStart: components[0]?.sourceStart, ltmEnd: components[0]?.sourceEnd }
+  }
+  if (entry.derivation === 'SUM_OF_LATEST_FOUR_COMPATIBLE_STANDALONE_QUARTERS' && components.length === 4) {
+    return { ltmStart: components[0]?.sourceStart, ltmEnd: components.at(-1)?.sourceEnd }
+  }
+  if (entry.derivation === 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD' && components.length === 3) {
+    const currentYtd = components.find((component) => component?.inputRole === 'CURRENT_YTD')
+    const priorYtd = components.find((component) => component?.inputRole === 'PRIOR_YEAR_COMPARABLE_YTD')
+    return { ltmStart: nextDate(priorYtd?.sourceEnd), ltmEnd: currentYtd?.sourceEnd }
+  }
+  return null
+}
+
+export function migrateAdjustedEbitdaLtmSnapshotRecord(record) {
+  const snapshot = record?.snapshot
+  const entry = snapshot?.provenance?.ebitda?.LTM
+  const metricValue = snapshot?.metrics?.ebitda?.LTM
+  if (!snapshot || !finite(metricValue) || !finite(entry?.value) ||
+      Number(metricValue) !== Number(entry.value) ||
+      !VERIFIED_CANONICAL_STATUSES.has(canonicalStatus(entry))) {
+    return { record, migrated: false }
+  }
+  if (validCurrentAdjustedEbitdaLtm(snapshot)) return { record, migrated: false }
+  if (entry.requestedPeriodType !== ADJUSTED_EBITDA_PERIOD.LTM) return { record, migrated: false }
+
+  const boundaries = reconstructedLtmBoundaries(entry)
+  if (!boundaries?.ltmStart || !boundaries?.ltmEnd) return { record, migrated: false }
+  const repairedEntry = {
+    ...structuredClone(entry),
+    ltmStart: boundaries.ltmStart,
+    ltmEnd: boundaries.ltmEnd,
+  }
+  repairedEntry.denominatorIdentity = adjustedEbitdaDenominatorIdentity(repairedEntry)
+  try {
+    assertCanonicalAdjustedEbitdaEntry(repairedEntry, ADJUSTED_EBITDA_PERIOD.LTM)
+  } catch {
+    return { record, migrated: false }
+  }
+
+  const migratedSnapshot = structuredClone(snapshot)
+  migratedSnapshot.provenance.ebitda.LTM = repairedEntry
+  migratedSnapshot.multipleDenominatorIdentity = {
+    ...(migratedSnapshot.multipleDenominatorIdentity ?? {}),
+    evEbitda: {
+      ...(migratedSnapshot.multipleDenominatorIdentity?.evEbitda ?? {}),
+      LTM: repairedEntry.denominatorIdentity,
+    },
+  }
+  return { migrated: true, record: { ...record, snapshot: migratedSnapshot } }
+}
+
+function prepareFinancialSnapshotRecord(record, requestedActualYears, options = {}) {
+  const versionMigration = migrateFinancialSnapshotRecord(record, requestedActualYears, options)
+  const ltmMigration = migrateAdjustedEbitdaLtmSnapshotRecord(versionMigration.record)
+  return {
+    record: ltmMigration.record,
+    migrated: versionMigration.migrated || ltmMigration.migrated,
+  }
 }
 
 export function migrateFinancialSnapshotRecord(record, requestedActualYears, options = {}) {
@@ -214,7 +305,11 @@ export function classifyAdjustedEbitdaSnapshotHealth(snapshot, actualYears) {
   const affected = periods.filter((period) => {
     const value = snapshot?.metrics?.ebitda?.[period]
     const status = canonicalStatus(snapshot?.provenance?.ebitda?.[period])
-    if (finite(value)) return !VERIFIED_CANONICAL_STATUSES.has(status)
+    if (finite(value)) {
+      if (!VERIFIED_CANONICAL_STATUSES.has(status)) return true
+      if (period === 'LTM') return !validCurrentAdjustedEbitdaLtm(snapshot)
+      return false
+    }
     return !EBITDA_LEGITIMATE_NULL_STATUSES.has(status) || EBITDA_REPAIR_STATUSES.has(status)
   })
   return {
@@ -264,7 +359,7 @@ export async function loadFinancialSnapshots(supabase, tickers, options = {}) {
         reason: notConfigured ? 'FINANCIAL_SNAPSHOT_STORE_NOT_CONFIGURED' : 'FINANCIAL_SNAPSHOT_READ_FAILED', detail: error.message },
     }
   }
-  const prepared = (data ?? []).map((record) => migrateFinancialSnapshotRecord(record, options.actualYears, options))
+  const prepared = (data ?? []).map((record) => prepareFinancialSnapshotRecord(record, options.actualYears, options))
   const migratedRecords = prepared.filter((item) => item.migrated).map((item) => item.record)
   if (migratedRecords.length) {
     const { error: migrationError } = await supabase
@@ -358,7 +453,7 @@ export function createMemoryFinancialSnapshotRepository() {
         snapshots: new Map(tickers.map(normalizeTicker).filter((ticker) => values.has(ticker))
           .map((ticker) => {
             let stored = structuredClone(values.get(ticker))
-            const migration = migrateFinancialSnapshotRecord({
+            const migration = prepareFinancialSnapshotRecord({
               engine_version: stored.financialSnapshot?.engineVersion,
               actual_years: stored.actualYears,
               updated_at: stored.financialSnapshot?.updatedAt,
