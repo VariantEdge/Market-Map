@@ -64,6 +64,21 @@ function calendarBridge(type = 'YTD_6M') {
   ]
 }
 
+function directLtm(start, end, value = 500_000_000, overrides = {}) {
+  return fact({ type: 'LTM', start, end, value, fiscalYear: Number(end.slice(0, 4)), ...overrides })
+}
+
+function fourQuarters(startYear = 2024, startMonth = 1, values = [10, 20, 30, 40]) {
+  const ranges = startMonth === 1
+    ? [[`${startYear}-01-01`, `${startYear}-03-31`], [`${startYear}-04-01`, `${startYear}-06-30`],
+        [`${startYear}-07-01`, `${startYear}-09-30`], [`${startYear}-10-01`, `${startYear}-12-31`]]
+    : [[`${startYear}-07-01`, `${startYear}-09-30`], [`${startYear}-10-01`, `${startYear}-12-31`],
+        [`${startYear + 1}-01-01`, `${startYear + 1}-03-31`], [`${startYear + 1}-04-01`, `${startYear + 1}-06-30`]]
+  return ranges.map(([start, end], index) => fact({
+    type: 'QUARTER', start, end, value: values[index] * 1_000_000, fiscalYear: Number(end.slice(0, 4)),
+  }))
+}
+
 for (const [type, expected] of [['YTD_6M', 120_000_000], ['YTD_9M', 120_000_000]]) {
   test(`constructs LTM from FY plus current ${type} minus comparable prior YTD`, () => {
     const result = build(calendarBridge(type))
@@ -135,4 +150,61 @@ test('bridge preserves complete component provenance in the final LTM result', (
     assert.ok(Number.isFinite(item.normalizedValue))
     assert.ok(item.sourceStart && item.sourceEnd && item.sourcePeriodType && item.currency)
   }
+})
+
+test('newer bridge beats older direct reported LTM', () => {
+  const result = build([directLtm('2024-01-01', '2024-12-31'), ...calendarBridge()])
+  assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
+  assert.equal(result.ltmEnd, '2025-06-30')
+})
+
+test('newer four-quarter result beats older direct reported LTM', () => {
+  const result = build([directLtm('2024-01-01', '2024-12-31'), ...fourQuarters(2024, 7)])
+  assert.equal(result.derivation, 'SUM_OF_LATEST_FOUR_COMPATIBLE_STANDALONE_QUARTERS')
+  assert.equal(result.ltmEnd, '2025-06-30')
+})
+
+test('newer bridge beats older four-quarter result', () => {
+  const result = build([...fourQuarters(2024), ...calendarBridge()])
+  assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
+  assert.equal(result.ltmEnd, '2025-06-30')
+})
+
+test('same-endpoint direct reported LTM beats four-quarter result', () => {
+  const result = build([directLtm('2024-07-01', '2025-06-30'), ...fourQuarters(2024, 7)])
+  assert.equal(result.derivation, 'DIRECT_REPORTED_LTM')
+  assert.equal(result.ltmEnd, '2025-06-30')
+})
+
+test('same-endpoint four-quarter result beats FY/YTD bridge', () => {
+  const result = build([...fourQuarters(2024, 7), ...calendarBridge()])
+  assert.equal(result.derivation, 'SUM_OF_LATEST_FOUR_COMPATIBLE_STANDALONE_QUARTERS')
+  assert.equal(result.ltmEnd, '2025-06-30')
+})
+
+test('selected result exposes the exact constructed LTM start and end', () => {
+  const bridge = build(calendarBridge())
+  assert.equal(bridge.ltmStart, '2024-07-01')
+  assert.equal(bridge.ltmEnd, '2025-06-30')
+  const quarters = build(fourQuarters(2024, 7))
+  assert.equal(quarters.ltmStart, '2024-07-01')
+  assert.equal(quarters.ltmEnd, '2025-06-30')
+})
+
+test('invalid newer candidate does not beat an older valid candidate', () => {
+  const invalidBridge = calendarBridge().map((item, index) => ({
+    ...item,
+    definitionFingerprint: `invalid-newer-${index}`,
+    tableContext: { ...item.tableContext, rowLabels: [`unique-${index}`] },
+  }))
+  const result = build([directLtm('2024-01-01', '2024-12-31'), ...invalidBridge])
+  assert.equal(result.derivation, 'DIRECT_REPORTED_LTM')
+  assert.equal(result.ltmEnd, '2024-12-31')
+})
+
+test('LTM invariant rejects tampered period identity and construction arithmetic', () => {
+  const bridge = build(calendarBridge())
+  assert.throws(() => assertCanonicalAdjustedEbitdaEntry({ ...bridge, ltmEnd: '2025-07-01' }, ADJUSTED_EBITDA_PERIOD.LTM))
+  const quarters = build(fourQuarters(2024, 7))
+  assert.throws(() => assertCanonicalAdjustedEbitdaEntry({ ...quarters, value: quarters.value + 1 }, ADJUSTED_EBITDA_PERIOD.LTM))
 })
