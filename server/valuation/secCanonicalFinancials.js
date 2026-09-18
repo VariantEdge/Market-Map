@@ -128,7 +128,7 @@ export const SEC_GAAP_METRIC_DEFINITIONS = Object.freeze({
       'PaymentsToAcquireOtherProductiveAssets',
       'PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities',
     ]),
-    extensionLabel: /^(?:payments|purchases|capital expenditures).*(?:property|plant|equipment)|^purchases of property and equipment$/i,
+    extensionLabel: /^(?:payments|purchases|capital expenditures).*(?:property|plant|equipment|computer hardware)|^purchases of (?:property and equipment|computer hardware)$/i,
     exclude: /business|combination|subsidiar|affiliate|investment|security|financ|lease|proceeds|unpaid|incurred but not/i,
     definitionFingerprint: 'SEC_CONSOLIDATED_GAAP_CAPITAL_EXPENDITURES',
     normalize: (value) => Math.abs(Number(value)),
@@ -424,6 +424,76 @@ function dateAuthorityRank(candidate) {
   return index < 0 ? order.length : index
 }
 
+function additiveCapexClass(candidate) {
+  const text = `${candidate.concept ?? ''} ${candidate.label ?? ''}`.toLowerCase().replace(/[^a-z0-9]+/g, ' ')
+  if (/\bcomputer\s+hardware\b/.test(text)) return 'COMPUTER_HARDWARE'
+  if (/\bproperty\s+plant\s+(?:and\s+)?equipment\b|\bproperty\s+and\s+equipment\b/.test(text)) {
+    return 'PROPERTY_PLANT_EQUIPMENT'
+  }
+  return null
+}
+
+function capexDerivationInput(candidate) {
+  return {
+    issuerId: candidate.issuerId,
+    metric: candidate.metric,
+    scope: 'CONSOLIDATED',
+    operationScope: candidate.operationScope,
+    currency: candidate.currency,
+    normalizedUnits: candidate.normalizedUnits,
+    normalizedValue: candidate.normalizedValue,
+    sourceProvider: 'SEC',
+    sourceId: candidate.sourceId,
+    sourceUrl: candidate.sourceUrl,
+    accession: candidate.accession,
+    filingDate: candidate.filingDate,
+    reportedVsDerived: OBSERVATION_BASIS.REPORTED,
+    deduplicationStatus: null,
+    periodIdentity: createPeriodIdentity({
+      periodType: candidate.periodType,
+      periodStart: candidate.periodStart,
+      periodEnd: candidate.periodEnd,
+      dateAuthority: candidate.dateAuthority ?? DATE_AUTHORITY.REPORTED,
+      fiscalYear: candidate.fiscalYear,
+      fiscalQuarter: candidate.fiscalQuarter,
+      fiscalCalendarId: candidate.fiscalCalendarId,
+    }),
+  }
+}
+
+function additiveCapexCandidate(candidates) {
+  if (candidates.length < 2) return null
+  const authority = dateAuthorityRank(candidates[0])
+  const eligible = candidates.filter((candidate) => dateAuthorityRank(candidate) === authority)
+  const accessions = new Set(eligible.map((candidate) => candidate.accession).filter(Boolean))
+  if (eligible.length < 2 || accessions.size !== 1) return null
+  if (eligible.some((candidate) => /\btotal\b|^capital expenditures?$/i.test(String(candidate.label ?? '').trim()))) return null
+  const classified = eligible.map((candidate) => ({ candidate, componentClass: additiveCapexClass(candidate) }))
+  if (classified.some((item) => !item.componentClass) ||
+      new Set(classified.map((item) => item.componentClass)).size !== classified.length) return null
+  const components = classified.map((item) => item.candidate)
+  const first = components[0]
+  return {
+    ...first,
+    rawValue: null,
+    normalizedValue: components.reduce((total, item) => total + Number(item.normalizedValue), 0),
+    namespace: 'derived',
+    concept: 'AdditiveNonOverlappingCashCapexComponents',
+    label: 'Additive non-overlapping cash capex components',
+    sourceId: components.map((item) => item.sourceId).sort().join('|PLUS|'),
+    alternatives: [],
+    conflicts: [],
+    restatedOrRecast: components.some((item) => item.restatedOrRecast),
+    reportedVsDerived: OBSERVATION_BASIS.DERIVED,
+    derivation: {
+      method: 'ADDITIVE_NON_OVERLAPPING_CASH_CAPEX_COMPONENTS',
+      exactness: 'EXACT_ARITHMETIC',
+      componentClasses: classified.map((item) => item.componentClass),
+      inputs: components.map(capexDerivationInput),
+    },
+  }
+}
+
 function selectCandidatePeriod(group, definition) {
   const byConcept = new Map()
   for (const candidate of group) {
@@ -439,6 +509,8 @@ function selectCandidatePeriod(group, definition) {
   const selected = resolvedConcepts[0]
   const selectedRank = conceptRank(selected, definition)
   const selectedDateAuthorityRank = dateAuthorityRank(selected)
+  const additiveCapex = selected.metric === 'capitalExpenditures' ? additiveCapexCandidate(resolvedConcepts) : null
+  if (additiveCapex) return additiveCapex
   const allPlausibleConceptsMustAgree = selected.metric === 'costOfRevenue' || selected.metric === 'capitalExpenditures'
   const conflicts = resolvedConcepts.filter((candidate) =>
     dateAuthorityRank(candidate) === selectedDateAuthorityRank &&
@@ -542,9 +614,11 @@ function canonicalSecObservation(candidate) {
     scope: 'CONSOLIDATED',
     operationScope: candidate.operationScope,
     confidence: candidate.conflicts.length ? 'LOW' : 'HIGH',
-    reportedVsDerived: OBSERVATION_BASIS.REPORTED,
+    reportedVsDerived: candidate.reportedVsDerived ?? OBSERVATION_BASIS.REPORTED,
+    derivation: candidate.derivation ?? null,
     semanticDefinitionFingerprint: SEMANTIC_DEFINITION[candidate.metric],
-    sourceDefinitionFingerprint: `${candidate.namespace}:${candidate.concept}`,
+    sourceDefinitionFingerprint: candidate.derivation?.method
+      ? `DERIVED:${candidate.derivation.method}` : `${candidate.namespace}:${candidate.concept}`,
     retrievedAt: candidate.retrievedAt,
     restatedOrRecast: candidate.restatedOrRecast,
     warnings: candidate.conflicts.length ? [`COMPETING_CONSOLIDATED_${candidate.metric.toUpperCase()}_CONCEPTS`] : [],
@@ -739,6 +813,8 @@ export function resolveWiseSheetsWithSecMetric(wiseObservations = [], secObserva
   const metricSec = secObservations.filter((item) => item.metric === metric)
   const authoritativeSourcePeriods = metricSec.filter((item) => hasAuthoritativeBoundaries(item.periodIdentity))
   const normalizedAuthoritative = deriveStandaloneQuarters(authoritativeSourcePeriods)
+  const authoritativeYtd = deduplicateEconomicPeriods(authoritativeSourcePeriods.filter((item) =>
+    [PERIOD_TYPE.YTD_6M, PERIOD_TYPE.YTD_9M].includes(item.periodIdentity.periodType)))
   const explicitEndOnlyQuarters = metricSec.filter((item) => item.periodIdentity.periodType === PERIOD_TYPE.STANDALONE_QUARTER &&
     !hasAuthoritativeBoundaries(item.periodIdentity) && item.explicitPeriodMapping === true)
   const normalizedSec = [...normalizedAuthoritative, ...explicitEndOnlyQuarters]
@@ -758,7 +834,7 @@ export function resolveWiseSheetsWithSecMetric(wiseObservations = [], secObserva
   })
   const secValueFilled = secQuarters.filter((sec) => !usedSec.has(sec.sourceId))
   return {
-    records: deduplicateEconomicPeriods([...resolvedWise, ...secValueFilled, ...secAnnuals]),
+    records: deduplicateEconomicPeriods([...resolvedWise, ...secValueFilled, ...authoritativeYtd, ...secAnnuals]),
     secValueFilled,
     failures: normalizationFailures,
   }

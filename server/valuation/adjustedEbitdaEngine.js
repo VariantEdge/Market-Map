@@ -3,7 +3,7 @@ import { HISTORICAL_VALIDATION_STATUS } from './issuerClassification.js'
 import { createHash } from 'node:crypto'
 
 const DAY_MS = 24 * 60 * 60 * 1000
-export const ADJUSTED_EBITDA_ENGINE_VERSION = 'company-defined-adjusted-ebitda-v2-ltm'
+export const ADJUSTED_EBITDA_ENGINE_VERSION = 'company-defined-adjusted-ebitda-v3-ltm-3m-bridge'
 const ALLOWED_FORMS = new Set([
   '10-K', '10-K/A', '10-Q', '10-Q/A', '8-K', '8-K/A',
   '20-F', '20-F/A', '40-F', '40-F/A', '6-K',
@@ -401,6 +401,7 @@ function immediatelyPrecedes(left, right) {
 
 function ltmBridgeCandidates(facts) {
   const ytdFacts = facts.filter((fact) =>
+    fact.periodType === ADJUSTED_EBITDA_PERIOD.QUARTER ||
     fact.periodType === ADJUSTED_EBITDA_PERIOD.YTD_6M ||
     fact.periodType === ADJUSTED_EBITDA_PERIOD.YTD_9M)
     .sort((left, right) => right.endDate.localeCompare(left.endDate))
@@ -622,7 +623,11 @@ export function assertCanonicalAdjustedEbitdaEntry(entry, requestedPeriodType) {
     }
     if (bridge) {
       const [fullYear, currentYtd, priorYtd] = entry.components
-      const ytdTypes = new Set([ADJUSTED_EBITDA_PERIOD.YTD_6M, ADJUSTED_EBITDA_PERIOD.YTD_9M])
+      const ytdTypes = new Set([
+        ADJUSTED_EBITDA_PERIOD.QUARTER,
+        ADJUSTED_EBITDA_PERIOD.YTD_6M,
+        ADJUSTED_EBITDA_PERIOD.YTD_9M,
+      ])
       const boundariesValid =
         [ADJUSTED_EBITDA_PERIOD.FISCAL_YEAR, ADJUSTED_EBITDA_PERIOD.CALENDAR_YEAR].includes(fullYear.sourcePeriodType) &&
         ytdTypes.has(currentYtd.sourcePeriodType) &&

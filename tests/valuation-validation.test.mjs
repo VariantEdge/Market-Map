@@ -130,6 +130,38 @@ test('derived Revenue and FCF denominators remain input evidence for multiple au
   }
 })
 
+test('historical multiples use corrected verified cells and reject stale denominators', () => {
+  const row = {
+    ticker: 'REGRESSION', currency: 'USD', capital: { enterpriseValue: 9_000_000_000 },
+    metrics: {
+      revenue: { '2025A': 3_000_000_000 },
+      ebit: { LTM: 1_800_000_000 },
+      freeCashFlow: { '2025A': 900_000_000 },
+    },
+    multiples: {
+      evRevenue: { '2025A': 3 },
+      evEbit: { LTM: 5 },
+      evFreeCashFlow: { '2025A': 10 },
+    },
+    provenance: {
+      revenue: { '2025A': { value: 3_000_000_000, status: 'VERIFIED_REPORTED', sourceType: 'SEC', components: [] } },
+      ebit: { LTM: { value: 1_800_000_000, status: 'VERIFIED_DERIVED', sourceType: 'Derived Calculation', components: [] } },
+      freeCashFlow: { '2025A': { value: 900_000_000, status: 'VERIFIED_DERIVED', sourceType: 'Derived Calculation', components: [] } },
+    },
+  }
+  const audit = buildRowAudit(row)
+  for (const cell of ['evRevenue:2025A', 'evEbit:LTM', 'evFreeCashFlow:2025A']) {
+    assert.equal(audit.cells[cell].status, VALIDATION_STATUS.DERIVED)
+    assert.equal(audit.cells[cell].checks.calculation.passed, true)
+    assert.equal(audit.cells[cell].displayable, true)
+  }
+
+  row.provenance.ebit.LTM = { ...row.provenance.ebit.LTM, status: 'STALE_SOURCE_COVERAGE' }
+  const stale = buildRowAudit(row).cells['evEbit:LTM']
+  assert.equal(stale.displayable, false)
+  assert.notEqual(stale.status, VALIDATION_STATUS.DERIVED)
+})
+
 test('a valid four-quarter Adjusted EBITDA denominator produces a displayable derived multiple', () => {
   const quarterEnds = ['2025-03-31', '2025-06-30', '2025-09-30', '2025-12-31']
   const source = {

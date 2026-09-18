@@ -114,7 +114,7 @@ export const METRIC_SOURCE_POLICY = Object.freeze({
   },
   operatingCashFlow: {
     concepts: ['NetCashProvidedByUsedInOperatingActivities', 'CashFlowsFromUsedInOperatingActivities', 'NetCashProvidedByUsedInContinuingOperations'],
-    extensionLabel: /^net cash (?:provided by|used in|provided by \(used in\)) operating activities$/i,
+    extensionLabel: /^net cash (?:provided by|used in|provided by \(used in\)) operating activities(?:,? continuing operations)?$/i,
     exclude: /discontinued/i,
   },
   capitalExpenditures: {

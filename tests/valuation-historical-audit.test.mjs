@@ -1,0 +1,58 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { validateHistoricalAuditRecords } from '../server/valuation/historicalAuditValidation.js'
+
+const tickers = ['AAA']
+const metrics = ['revenue', 'grossProfit', 'ebit', 'operatingCashFlow', 'capitalExpenditures', 'freeCashFlow', 'adjustedEbitda']
+const periods = ['2023A', '2024A', '2025A', 'LTM']
+
+function record(metric, period, overrides = {}) {
+  return {
+    ticker: 'AAA', metric, calendarYear: period, displayedValue: 10,
+    validationStatus: 'VERIFIED_DERIVED', failureReason: null, warning: '',
+    quarterlyComponents: [{ sourceProvider: 'SEC', sourceId: `${metric}:${period}`,
+      sourceStart: '2025-01-01', sourceEnd: '2025-12-31' }],
+    ...overrides,
+  }
+}
+
+test('historical audit requires exactly seven metrics across all requested actual and LTM periods', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  assert.deepEqual(validateHistoricalAuditRecords(records, { tickers, metrics, periods }), [])
+  const missing = records.filter((item) => !(item.metric === 'ebit' && item.calendarYear === 'LTM'))
+  assert.ok(validateHistoricalAuditRecords(missing, { tickers, metrics, periods })
+    .some((issue) => issue.metric === 'ebit' && issue.period === 'LTM' && issue.reason === 'MISSING_AUDIT_CELL'))
+})
+
+test('historical audit accepts explicit fail-closed N/A and rejects stale generic nulls', () => {
+  const base = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  const explicit = base.map((item) => item.metric === 'adjustedEbitda' && item.calendarYear === 'LTM'
+    ? record(item.metric, item.calendarYear, { displayedValue: null, validationStatus: 'DEFINITION_INCOMPATIBLE',
+      quarterlyComponents: [], failureReason: 'DEFINITION_INCOMPATIBLE' }) : item)
+  assert.deepEqual(validateHistoricalAuditRecords(explicit, { tickers, metrics, periods }), [])
+  const unjustified = explicit.map((item) => item.metric === 'revenue' && item.calendarYear === '2025A'
+    ? record(item.metric, item.calendarYear, { displayedValue: null, validationStatus: 'UNVERIFIED', quarterlyComponents: [] }) : item)
+  assert.ok(validateHistoricalAuditRecords(unjustified, { tickers, metrics, periods })
+    .some((issue) => issue.metric === 'revenue' && issue.reason === 'UNJUSTIFIED_NULL'))
+})
+
+test('historical audit rejects values without period identity and source provenance', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  records[0].quarterlyComponents = [{ sourceProvider: 'SEC', sourceId: 'missing-dates' }]
+  assert.ok(validateHistoricalAuditRecords(records, { tickers, metrics, periods })
+    .some((issue) => issue.reason === 'INCOMPLETE_COMPONENT_PROVENANCE'))
+})
+
+test('historical audit accepts explicit fiscal-quarter identity when provider omits period start', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period, {
+    quarterlyComponents: [{
+      sourceProvider: 'WiseSheets',
+      sourceId: `${metric}:${period}`,
+      sourceStart: null,
+      sourceEnd: '2025-12-31',
+      fiscalYear: 2025,
+      fiscalQuarter: 4,
+    }],
+  })))
+  assert.deepEqual(validateHistoricalAuditRecords(records, { tickers, metrics, periods }), [])
+})

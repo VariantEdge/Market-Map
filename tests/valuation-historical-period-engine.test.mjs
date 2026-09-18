@@ -21,19 +21,37 @@ function observation({ ticker = 'NEWCO', type = PERIOD_TYPE.STANDALONE_QUARTER, 
   fiscalYear = null, fiscalQuarter = null, sequenceIndex = null, dateAuthority = DATE_AUTHORITY.REPORTED,
   provider = 'WiseSheets', sourceId, definitionFingerprint = null, scope = 'CONSOLIDATED',
   semanticDefinitionFingerprint = null, sourceDefinitionFingerprint = null, derivation = null,
-  reportedVsDerived = OBSERVATION_BASIS.REPORTED, restatedOrRecast = false }) {
+  reportedVsDerived = OBSERVATION_BASIS.REPORTED, restatedOrRecast = false,
+  operationScope = 'UNSPECIFIED', currency = 'USD', units = 'USD', metric = 'revenue' }) {
   return createCanonicalObservation({
-    ticker, issuerId: `${ticker}-ISSUER`, metric: 'revenue', rawValue: value, normalizedValue: value,
-    rawUnits: 'USD', normalizedUnits: 'USD', currency: 'USD', sourceProvider: provider,
+    ticker, issuerId: `${ticker}-ISSUER`, metric, rawValue: value, normalizedValue: value,
+    rawUnits: units, normalizedUnits: units, currency, sourceProvider: provider,
     sourceId: sourceId ?? `${provider}:${ticker}:${start}:${end}`, filingDate: end,
     sourceUrl: `https://example.test/${provider}/${ticker}`, accession: `${provider}-${ticker}-${end}`,
-    scope, reportedVsDerived, definitionFingerprint, semanticDefinitionFingerprint,
+    scope, operationScope, reportedVsDerived, definitionFingerprint, semanticDefinitionFingerprint,
     sourceDefinitionFingerprint, derivation, restatedOrRecast,
     periodIdentity: createPeriodIdentity({
       periodType: type, periodStart: start, periodEnd: end, dateAuthority,
       fiscalYear, fiscalQuarter, fiscalCalendarId: `${ticker}-CALENDAR`, sequenceIndex,
     }),
   })
+}
+
+function ltmBridgeFacts(kind = '3M', overrides = {}) {
+  const periods = {
+    '3M': { type: PERIOD_TYPE.STANDALONE_QUARTER, priorEnd: '2024-03-31', currentEnd: '2025-03-31', quarter: 1 },
+    '6M': { type: PERIOD_TYPE.YTD_6M, priorEnd: '2024-06-30', currentEnd: '2025-06-30', quarter: 2 },
+    '9M': { type: PERIOD_TYPE.YTD_9M, priorEnd: '2024-09-30', currentEnd: '2025-09-30', quarter: 3 },
+  }[kind]
+  const common = { ticker: 'BRIDGE', metric: 'ebit', definitionFingerprint: 'GAAP_EBIT', ...overrides }
+  return [
+    observation({ ...common, type: PERIOD_TYPE.FISCAL_YEAR, start: '2024-01-01', end: '2024-12-31',
+      value: 100, fiscalYear: 2024 }),
+    observation({ ...common, type: periods.type, start: '2024-01-01', end: periods.priorEnd,
+      value: 20, fiscalYear: 2024, fiscalQuarter: periods.quarter }),
+    observation({ ...common, type: periods.type, start: '2025-01-01', end: periods.currentEnd,
+      value: 30, fiscalYear: 2025, fiscalQuarter: periods.quarter }),
+  ]
 }
 
 function calendarQuarters(year, ticker = 'NEWCO') {
@@ -220,6 +238,75 @@ test('LTM uses the latest four unique consecutive quarters and rejects a gap', (
   assert.equal(buildLtm(five, { asOfDate: '2025-04-01' }).value, 14)
   const gap = [five[0], five[1], five[3], five[4]]
   assert.equal(buildLtm(gap, { asOfDate: '2025-04-01' }).reason, 'LTM_PERIOD_GAP')
+})
+
+for (const kind of ['3M', '6M', '9M']) {
+  test(`LTM falls back to an exact FY plus current ${kind} minus prior comparable ${kind} bridge`, () => {
+    const result = buildLtm(ltmBridgeFacts(kind), { asOfDate: '2026-01-01' })
+    assert.equal(result.value, 110)
+    assert.equal(result.status, HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED)
+    assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
+    assert.deepEqual(result.components.map((item) => item.role), [
+      'LATEST_VERIFIED_FULL_YEAR', 'CURRENT_YTD', 'PRIOR_YEAR_COMPARABLE_YTD',
+    ])
+    assert.deepEqual(result.components.map((item) => item.sign), [1, 1, -1])
+  })
+}
+
+test('LTM bridge fails closed when prior comparable YTD is missing', () => {
+  const [fullYear, , current] = ltmBridgeFacts('6M')
+  const result = buildLtm([fullYear, current], { asOfDate: '2026-01-01' })
+  assert.equal(result.value, null)
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE)
+})
+
+test('LTM bridge rejects incompatible definitions, operation scopes, and currencies', () => {
+  const definitions = ltmBridgeFacts('6M')
+  definitions[2] = observation({ ticker: 'BRIDGE', metric: 'ebit', type: PERIOD_TYPE.YTD_6M,
+    start: '2025-01-01', end: '2025-06-30', value: 30, fiscalYear: 2025, fiscalQuarter: 2,
+    definitionFingerprint: 'CHANGED' })
+  assert.equal(buildLtm(definitions, { asOfDate: '2026-01-01' }).status,
+    HISTORICAL_RESULT_STATUS.DEFINITION_INCOMPATIBLE)
+
+  const operationScope = ltmBridgeFacts('6M')
+  operationScope[2] = observation({ ticker: 'BRIDGE', metric: 'ebit', type: PERIOD_TYPE.YTD_6M,
+    start: '2025-01-01', end: '2025-06-30', value: 30, fiscalYear: 2025, fiscalQuarter: 2,
+    definitionFingerprint: 'GAAP_EBIT', operationScope: 'CONTINUING_OPERATIONS' })
+  assert.equal(buildLtm(operationScope, { asOfDate: '2026-01-01' }).status,
+    HISTORICAL_RESULT_STATUS.OPERATION_SCOPE_INCOMPATIBLE)
+
+  const currency = ltmBridgeFacts('6M')
+  currency[2] = observation({ ticker: 'BRIDGE', metric: 'ebit', type: PERIOD_TYPE.YTD_6M,
+    start: '2025-01-01', end: '2025-06-30', value: 30, fiscalYear: 2025, fiscalQuarter: 2,
+    definitionFingerprint: 'GAAP_EBIT', currency: 'EUR', units: 'EUR' })
+  const currencyResult = buildLtm(currency, { asOfDate: '2026-01-01' })
+  assert.equal(currencyResult.value, null)
+  assert.equal(currencyResult.reason, 'INCOMPATIBLE_SERIES')
+})
+
+test('stale bridge YTD fails closed against the latest reported period', () => {
+  const latestReportedPeriod = createLatestReportedPeriod({
+    periodEnd: '2025-09-30', form: '10-Q', evidenceType: 'FORM_REPORT_PERIOD',
+  })
+  const result = buildLtm(ltmBridgeFacts('6M'), { asOfDate: '2026-01-01', latestReportedPeriod })
+  assert.equal(result.value, null)
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.STALE_SOURCE_COVERAGE)
+})
+
+test('four consecutive standalone quarters remain preferred over an available FY/YTD bridge', () => {
+  const bridge = ltmBridgeFacts('3M')
+  const quarters = [
+    observation({ ticker: 'BRIDGE', metric: 'ebit', start: '2024-04-01', end: '2024-06-30', value: 40,
+      fiscalYear: 2024, fiscalQuarter: 2, definitionFingerprint: 'GAAP_EBIT' }),
+    observation({ ticker: 'BRIDGE', metric: 'ebit', start: '2024-07-01', end: '2024-09-30', value: 50,
+      fiscalYear: 2024, fiscalQuarter: 3, definitionFingerprint: 'GAAP_EBIT' }),
+    observation({ ticker: 'BRIDGE', metric: 'ebit', start: '2024-10-01', end: '2024-12-31', value: 60,
+      fiscalYear: 2024, fiscalQuarter: 4, definitionFingerprint: 'GAAP_EBIT' }),
+  ]
+  const result = buildLtm([...bridge, ...quarters], { asOfDate: '2026-01-01' })
+  assert.equal(result.value, 180)
+  assert.equal(result.derivation, undefined)
+  assert.equal(result.components.length, 4)
 })
 
 test('definition compatibility is limited to the latest four LTM contributors', () => {

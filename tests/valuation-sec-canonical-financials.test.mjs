@@ -180,6 +180,31 @@ test('Alphabet 2024 SEC annual fixture resolves canonical EBIT with accession pr
   assert.match(result.calendarActuals.ebit[2024].components[0].sourceUrl, /^https:\/\/data\.sec\.gov\//)
 })
 
+for (const regression of [
+  { ticker: 'GOOGL', fullYear: 140_000_000_000, currentYtd: 80_000_000_000, priorYtd: 72_372_000_000, expected: 147_628_000_000 },
+  { ticker: 'GEV', fullYear: 1_600_000_000, currentYtd: 900_000_000, priorYtd: 700_000_000, expected: 1_800_000_000 },
+  { ticker: 'CRWV', fullYear: -500_000_000, currentYtd: -100_000_000, priorYtd: -369_000_000, expected: -231_000_000 },
+  { ticker: 'NBIS', fullYear: -738_000_000, currentYtd: -300_000_000, priorYtd: -353_900_000, expected: -684_100_000 },
+]) {
+  test(`${regression.ticker} LTM EBIT regression uses the generic FY plus comparable H1 bridge`, () => {
+    const fixtureCompany = { ticker: regression.ticker, cik: '0000000001', name: regression.ticker, fiscalYearEnd: '1231' }
+    const facts = factsByConcept({ OperatingIncomeLoss: [
+      fact('2025-01-01', '2025-12-31', regression.fullYear,
+        { fp: 'FY', fy: 2025, form: '10-K', filed: '2026-02-15', accn: `${regression.ticker}-fy` }),
+      fact('2025-01-01', '2025-06-30', regression.priorYtd,
+        { fp: 'Q2', fy: 2025, form: '10-Q', filed: '2025-07-30', accn: `${regression.ticker}-h1-prior` }),
+      fact('2026-01-01', '2026-06-30', regression.currentYtd,
+        { fp: 'Q2', fy: 2026, form: '10-Q', filed: '2026-07-30', accn: `${regression.ticker}-h1-current` }),
+    ] })
+    const result = buildSecEnrichedFinancialsShadow({
+      ticker: regression.ticker, company: fixtureCompany, facts,
+      wiseSheetsRows: [], years: [2025], asOfDate: '2026-08-01',
+    })
+    assert.equal(result.ltm.ebit.value, regression.expected)
+    assert.equal(result.ltm.ebit.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
+  })
+}
+
 test('EBIT accepts IFRS operating profit and a clear extension but rejects adjusted or segment facts', () => {
   const annual = { fp: 'FY', form: '20-F', filed: '2025-03-01' }
   const facts = {
@@ -321,6 +346,49 @@ test('non-inline-XBRL earnings exhibit maps only explicit duration and end-date 
   const latest = resolveLatestReportedFinancialPeriod('revenue', canonical.observations, filings, '2026-08-13')
   assert.equal(latest.periodEnd, '2026-06-30')
   assert.equal(latest.evidenceType, 'EARNINGS_EXHIBIT_PERIOD')
+})
+
+test('explicit H1 earnings-exhibit periods remain available for FY plus YTD LTM bridges', () => {
+  const fixtureCompany = { ticker: 'FOREIGN', cik: '0001513845', name: 'Foreign Issuer', fiscalYearEnd: '1231' }
+  const filing = {
+    id: 'h1-results', form: '6-K', accessionNumber: 'h1-results', filingDate: '2026-08-12',
+    reportDate: '2026-06-30', filingUrl: 'https://www.sec.gov/h1-results.htm', immutableSourceId: 'SEC:1513845:h1-results',
+  }
+  const html = `<body><p>USD millions</p><h3>Consolidated results</h3><table>
+    <tr><th></th><th>Six months ended June 30, 2026</th><th>Six months ended June 30, 2025</th></tr>
+    <tr><td>Gross profit</td><td>850.0</td><td>207.3</td></tr>
+    <tr><td>Operating loss</td><td>(300.0)</td><td>(353.9)</td></tr>
+    <tr><td>Net cash provided by operating activities, continuing operations</td><td>5,000.0</td><td>143.9</td></tr>
+    </table></body>`
+  const supplementalFacts = extractStructuredFinancialTableFacts({ company: fixtureCompany, filing, html })
+  assert.ok(supplementalFacts.every((item) => item.explicitPeriodMapping === true))
+  assert.deepEqual([...new Set(supplementalFacts.map((item) => item.periodType))], ['YTD_6M'])
+  const annualFacts = {
+    cik: fixtureCompany.cik,
+    facts: { 'us-gaap': {
+      GrossProfit: { label: 'Gross profit', units: { USD: [fact('2025-01-01', '2025-12-31', 363_600_000,
+        { fp: 'FY', fy: 2025, form: '20-F', filed: '2026-04-30', accn: 'fy25' })] } },
+      OperatingIncomeLoss: { label: 'Operating loss', units: { USD: [fact('2025-01-01', '2025-12-31', -738_000_000,
+        { fp: 'FY', fy: 2025, form: '20-F', filed: '2026-04-30', accn: 'fy25' })] } },
+      NetCashProvidedByUsedInOperatingActivitiesContinuingOperations: { label: 'Net cash from operating activities, continuing operations',
+        units: { USD: [fact('2025-01-01', '2025-12-31', 401_900_000,
+          { fp: 'FY', fy: 2025, form: '20-F', filed: '2026-04-30', accn: 'fy25' })] } },
+    } },
+  }
+  const result = buildSecEnrichedFinancialsShadow({
+    ticker: fixtureCompany.ticker, company: fixtureCompany, facts: annualFacts,
+    filings: { company: fixtureCompany, filings: [filing] }, supplementalFacts,
+    wiseSheetsRows: [], years: [2025], asOfDate: '2026-08-13',
+  })
+  assert.equal(result.records.grossProfit.filter((item) => item.periodIdentity.periodType === PERIOD_TYPE.YTD_6M).length, 2)
+  assert.equal(result.ltm.grossProfit.value, 1_006_300_000)
+  assert.equal(result.ltm.ebit.value, -684_100_000)
+  assert.equal(result.ltm.operatingCashFlow.value, 5_258_000_000)
+  for (const metric of ['grossProfit', 'ebit', 'operatingCashFlow']) {
+    assert.equal(result.ltm[metric].derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
+    assert.equal(result.ltm[metric].components.length, 3)
+    assert.ok(result.ltm[metric].components.every((item) => item.sourceUrl))
+  }
 })
 
 test('an earnings filing date and FY label cannot manufacture a financial period end', async () => {
@@ -734,6 +802,54 @@ test('capex semantic selection excludes investments and normalizes sign only aft
   assert.equal(result.observations.length, 1)
   assert.equal(result.observations[0].rawValue, -30)
   assert.equal(result.observations[0].normalizedValue, 30)
+})
+
+test('distinct same-filing cash capex components are summed only when labels prove non-overlap', () => {
+  const fixtureCompany = { ticker: 'CAPEXCO', cik: '0001878848', name: 'Capex Company', fiscalYearEnd: '0630' }
+  const accessionNumber = 'capex-components'
+  const common = {
+    units: 'USD', currency: 'USD', startDate: '2025-07-01', endDate: '2026-06-30',
+    periodType: 'FISCAL_YEAR', fiscalPeriod: 'FY', fiscalYear: 2026,
+    filingForm: '20-F', filingDate: '2026-08-28', accessionNumber,
+    filingUrl: 'https://www.sec.gov/capex-components.htm', dateAuthority: DATE_AUTHORITY.REPORTED,
+    explicitPeriodMapping: true, metricCandidates: ['capitalExpenditures'], namespace: 'iren',
+  }
+  const supplementalFacts = [
+    { ...common, id: 'ppe', concept: 'PaymentsToAcquirePropertyPlantAndEquipment',
+      label: 'Purchases of property, plant and equipment', value: -2_998_006_000 },
+    { ...common, id: 'hardware', concept: 'PurchasesOfComputerHardware',
+      label: 'Purchases of computer hardware', value: -1_335_081_000 },
+  ]
+  const facts = {
+    cik: fixtureCompany.cik,
+    facts: { 'us-gaap': { NetCashProvidedByUsedInOperatingActivities: {
+      label: 'Net cash provided by operating activities', units: { USD: [fact('2025-07-01', '2026-06-30', 2_100_418_000,
+        { fp: 'FY', fy: 2026, form: '20-F', filed: '2026-08-28', accn: accessionNumber })] },
+    } } },
+  }
+  const result = buildSecEnrichedFinancialsShadow({
+    ticker: fixtureCompany.ticker, company: fixtureCompany, facts,
+    filings: { company: fixtureCompany, filings: [{ accessionNumber, filingUrl: common.filingUrl }] },
+    supplementalFacts, wiseSheetsRows: [], years: [2025], asOfDate: '2026-09-01',
+  })
+  const capex = result.records.capitalExpenditures.find((item) => item.periodIdentity.periodEnd === '2026-06-30')
+  const fcf = result.records.freeCashFlow.find((item) => item.periodIdentity.periodEnd === '2026-06-30')
+  assert.equal(capex.normalizedValue, 4_333_087_000)
+  assert.equal(capex.reportedVsDerived, 'DERIVED')
+  assert.equal(capex.derivation.method, 'ADDITIVE_NON_OVERLAPPING_CASH_CAPEX_COMPONENTS')
+  assert.deepEqual(capex.derivation.componentClasses, ['PROPERTY_PLANT_EQUIPMENT', 'COMPUTER_HARDWARE'])
+  assert.equal(fcf.normalizedValue, -2_232_669_000)
+  assert.equal(fcf.derivation.inputs[1].normalizedValue, 4_333_087_000)
+})
+
+test('ambiguous capex concepts remain a conflict and are never blindly summed', () => {
+  const facts = factsByConcept({
+    PaymentsToAcquirePropertyPlantAndEquipment: [fact('2025-01-01', '2025-12-31', -100, { fp: 'FY', form: '10-K' })],
+    PaymentsToAcquireProductiveAssets: [fact('2025-01-01', '2025-12-31', -150, { fp: 'FY', form: '10-K' })],
+  })
+  const result = adaptSecCanonicalFinancials({ company, facts, metrics: ['capitalExpenditures'] })
+  assert.equal(result.observations[0].deduplicationStatus, 'REQUIRES_REVIEW')
+  assert.equal(result.observations[0].derivation, null)
 })
 
 test('legacy supplemental metric candidates cannot bypass capex semantic exclusions', () => {

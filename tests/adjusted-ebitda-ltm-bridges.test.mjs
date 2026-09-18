@@ -43,6 +43,18 @@ test('accepts direct reported LTM with complete company-defined provenance', () 
   assertCanonicalAdjustedEbitdaEntry(result, ADJUSTED_EBITDA_PERIOD.LTM)
 })
 
+test('CRWV directly reported 2023 calendar-year Adjusted EBITDA remains available', () => {
+  const result = buildCanonicalAdjustedEbitda({
+    company: { ...company, ticker: 'CRWV' },
+    rawLedger: [fact({ type: 'CALENDAR_YEAR', start: '2023-01-01', end: '2023-12-31',
+      value: 103_913_000, fiscalYear: 2023 })],
+    years: [2023],
+  }).calendarActuals[2023]
+  assert.equal(result.value, 103_913_000)
+  assert.equal(result.validationStatus, 'VERIFIED_REPORTED')
+  assertCanonicalAdjustedEbitdaEntry(result, ADJUSTED_EBITDA_PERIOD.CALENDAR_YEAR)
+})
+
 test('four-quarter LTM remains the preferred derived method', () => {
   const result = build([
     fact({ type: 'QUARTER', start: '2025-01-01', end: '2025-03-31', value: 10_000_000, fiscalYear: 2025 }),
@@ -57,10 +69,13 @@ test('four-quarter LTM remains the preferred derived method', () => {
 
 function calendarBridge(type = 'YTD_6M') {
   const nine = type === 'YTD_9M'
+  const three = type === 'QUARTER'
   return [
     fact({ type: 'CALENDAR_YEAR', start: '2024-01-01', end: '2024-12-31', value: 100_000_000, fiscalYear: 2024 }),
-    fact({ type, start: '2025-01-01', end: nine ? '2025-09-30' : '2025-06-30', value: nine ? 90_000_000 : 60_000_000, fiscalYear: 2025 }),
-    fact({ type, start: '2024-01-01', end: nine ? '2024-09-30' : '2024-06-30', value: nine ? 70_000_000 : 40_000_000, fiscalYear: 2024 }),
+    fact({ type, start: '2025-01-01', end: three ? '2025-03-31' : nine ? '2025-09-30' : '2025-06-30',
+      value: three ? 30_000_000 : nine ? 90_000_000 : 60_000_000, fiscalYear: 2025 }),
+    fact({ type, start: '2024-01-01', end: three ? '2024-03-31' : nine ? '2024-09-30' : '2024-06-30',
+      value: three ? 10_000_000 : nine ? 70_000_000 : 40_000_000, fiscalYear: 2024 }),
   ]
 }
 
@@ -79,7 +94,7 @@ function fourQuarters(startYear = 2024, startMonth = 1, values = [10, 20, 30, 40
   }))
 }
 
-for (const [type, expected] of [['YTD_6M', 120_000_000], ['YTD_9M', 120_000_000]]) {
+for (const [type, expected] of [['QUARTER', 120_000_000], ['YTD_6M', 120_000_000], ['YTD_9M', 120_000_000]]) {
   test(`constructs LTM from FY plus current ${type} minus comparable prior YTD`, () => {
     const result = build(calendarBridge(type))
     assert.equal(result.value, expected)
@@ -87,6 +102,23 @@ for (const [type, expected] of [['YTD_6M', 120_000_000], ['YTD_9M', 120_000_000]
     assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
     assert.deepEqual(result.components.map((item) => item.inputRole),
       ['LATEST_VERIFIED_FULL_YEAR', 'CURRENT_YTD', 'PRIOR_YEAR_COMPARABLE_YTD'])
+    assertCanonicalAdjustedEbitdaEntry(result, ADJUSTED_EBITDA_PERIOD.LTM)
+  })
+}
+
+for (const regression of [
+  { ticker: 'GEV', fullYear: 3_700_000_000, currentYtd: 2_300_000_000, priorYtd: 1_885_000_000, expected: 4_115_000_000 },
+  { ticker: 'FCEL', fullYear: -74_000_000, currentYtd: -51_000_000, priorYtd: -36_499_000, expected: -88_501_000 },
+]) {
+  test(`${regression.ticker} Adjusted EBITDA LTM regression uses compatible company-defined periods`, () => {
+    const records = [
+      fact({ type: 'CALENDAR_YEAR', start: '2025-01-01', end: '2025-12-31', value: regression.fullYear, fiscalYear: 2025 }),
+      fact({ type: 'YTD_6M', start: '2026-01-01', end: '2026-06-30', value: regression.currentYtd, fiscalYear: 2026 }),
+      fact({ type: 'YTD_6M', start: '2025-01-01', end: '2025-06-30', value: regression.priorYtd, fiscalYear: 2025 }),
+    ]
+    const result = buildCanonicalAdjustedEbitda({ company: { ...company, ticker: regression.ticker }, rawLedger: records, years: [2025] }).ltm
+    assert.equal(result.value, regression.expected)
+    assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
     assertCanonicalAdjustedEbitdaEntry(result, ADJUSTED_EBITDA_PERIOD.LTM)
   })
 }

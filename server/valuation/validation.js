@@ -165,7 +165,13 @@ export function createAuditRecord({
     CANONICAL_RESULT_STATUSES.has(normalizedLedgerStatus(source?.validationStatus))
     ? normalizedLedgerStatus(source.validationStatus)
     : null
-  const status = canonicalStatus ?? (finite(value)
+  const sourceStatus = normalizedLedgerStatus(source?.validationStatus)
+  const derivedSourceFailureStatus = isDerivedOutputMetric(metric) &&
+    CANONICAL_RESULT_STATUSES.has(sourceStatus) &&
+    ![HISTORICAL_RESULT_STATUS.VERIFIED_REPORTED, HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED].includes(sourceStatus)
+    ? sourceStatus
+    : null
+  const status = canonicalStatus ?? derivedSourceFailureStatus ?? (finite(value)
     ? chooseStatus({
         source,
         sourceCheck,

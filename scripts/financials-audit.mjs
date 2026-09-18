@@ -4,13 +4,24 @@ import { getCompanyFacts, resolveCompany } from '../server/sec/edgar.js'
 import { buildCanonicalQuarterlyLedger, HISTORICAL_STATUS, METRIC_DEFINITIONS } from '../server/valuation/financialLedger.js'
 import { buildFilingIndex } from '../server/valuation/filingIndex.js'
 import { loadSupplementalFilingFacts } from '../server/valuation/filingFactExtractor.js'
-import { calculateLtm, enforceLtmFreshness } from '../server/valuation/calendarization.js'
+import { enforceLtmFreshness } from '../server/valuation/calendarization.js'
 import { HISTORICAL_VALIDATION_STATUS, classifyIssuer, isOperatingCompanyClassification } from '../server/valuation/issuerClassification.js'
 import { MARKET_MAPS } from '../src/data.js'
 import { assertCanonicalAdjustedEbitdaEntry, ADJUSTED_EBITDA_PERIOD } from '../server/valuation/adjustedEbitdaEngine.js'
+import { buildCanonicalHistoricalFinancials } from '../server/valuation/secCanonicalFinancials.js'
+import { fetchWiseSheetsCanonicalRows } from '../server/valuation/wiseSheetsCanonicalShadow.js'
+import { validateHistoricalAuditRecords } from '../server/valuation/historicalAuditValidation.js'
 
 const DEFAULT_TICKERS = ['BE', 'GEV', 'FCEL', 'INTC', 'MU', 'NBIS', 'CRWV', 'IREN', 'GOOGL', 'AMZN', 'META', 'MSFT']
-const VALID_METRICS = ['revenue', 'grossProfit', 'ebitda', 'freeCashFlow']
+const VALID_METRICS = [
+  'revenue', 'grossProfit', 'ebit', 'operatingCashFlow',
+  'capitalExpenditures', 'freeCashFlow', 'adjustedEbitda',
+]
+const AUDIT_METRIC_DEFINITIONS = Object.freeze({
+  ...METRIC_DEFINITIONS,
+  ebit: { definition: 'Consolidated GAAP or IFRS operating income or loss' },
+  adjustedEbitda: METRIC_DEFINITIONS.ebitda,
+})
 
 function option(name) {
   const index = process.argv.indexOf(name)
@@ -22,7 +33,7 @@ function csvCell(value) {
 }
 
 function rootCause(entry) {
-  const text = `${entry.method ?? ''} ${(entry.warnings ?? []).join(' ')}`.toLowerCase()
+  const text = `${entry.reason ?? ''} ${entry.method ?? ''} ${(entry.warnings ?? []).join(' ')}`.toLowerCase()
   if (/annual-reconciliation/.test(text)) return 'Annual reconciliation failure'
   if (/incomplete-quarter/.test(text)) return 'Incomplete quarter coverage'
   if (/conflict/.test(text)) return 'Restated or conflicting SEC fact'
@@ -75,6 +86,7 @@ const manifestFilename = path.join(outputDirectory, 'manifest.json')
 const previousManifest = await readJson(manifestFilename, {})
 const records = []
 const companyResults = []
+const wiseSheetsRows = await fetchWiseSheetsCanonicalRows(requestedTickers)
 
 function failClosedAdjustedEbitda(entry, requestedPeriodType) {
   if (entry?.value == null) return entry
@@ -94,8 +106,15 @@ function failClosedAdjustedEbitda(entry, requestedPeriodType) {
 
 function compactAuditComponents(components = []) {
   return components.map((component) => ({
+    sourceProvider: component.sourceProvider ?? component.provider ??
+      (String(component.sourceType ?? '').startsWith('SEC') ? 'SEC' : null),
     sourceStart: component.sourceStart ?? component.quarterStart ?? component.start ?? null,
     sourceEnd: component.sourceEnd ?? component.quarterEnd ?? component.end ?? null,
+    fiscalYear: component.fiscalYear ?? null,
+    fiscalQuarter: component.fiscalQuarter ?? null,
+    fiscalCalendarId: component.fiscalCalendarId ?? null,
+    dateAuthority: component.dateAuthority ?? null,
+    economicPeriodKey: component.economicPeriodKey ?? null,
     sourcePeriodType: component.sourcePeriodType ?? null,
     sourcePeriodBasis: component.sourcePeriodBasis ?? null,
     sourceValue: component.sourceValue ?? null,
@@ -109,6 +128,8 @@ function compactAuditComponents(components = []) {
     filingForm: component.filingForm ?? null,
     document: component.document ?? null,
     sourceType: component.sourceType ?? null,
+    role: component.role ?? component.inputRole ?? null,
+    sign: component.sign ?? null,
     tableTitle: component.tableTitle ?? null,
     tableIndex: component.tableIndex ?? null,
     rowIndex: component.rowIndex ?? null,
@@ -149,22 +170,22 @@ function auditRecord({ company, ticker, cik, metric, period, entry, snapshot, cl
   const component = entry?.components?.[0] ?? null
   return {
     company, ticker, cik, metric,
-    metricDefinition: METRIC_DEFINITIONS[metric].definition,
+    metricDefinition: AUDIT_METRIC_DEFINITIONS[metric].definition,
     calendarYear: period,
     displayedValue: entry?.value ?? null,
-    exactness: entry?.exactness ?? null,
-    validationStatus: entry?.validationStatus ?? HISTORICAL_STATUS.UNAVAILABLE,
-    primarySource: entry?.sourceType ?? 'Unavailable',
+    exactness: entry?.classification ?? entry?.exactness ?? null,
+    validationStatus: entry?.status ?? entry?.validationStatus ?? HISTORICAL_STATUS.UNAVAILABLE,
+    primarySource: component?.sourceProvider ?? entry?.sourceType ?? 'Unavailable',
     primarySourceUrl: entry?.sourceUrl ?? snapshot.documentUrl,
     secondarySource: null,
     primarySourceValue: entry?.value ?? null,
     secondarySourceValue: null,
     sourceDifference: null,
     quarterlyComponents: compactAuditComponents(entry?.components),
-    formula: entry?.method ?? 'unavailable',
+    formula: entry?.derivation ?? entry?.method ?? 'unavailable',
     derivation: entry?.derivation ?? null,
     reconciliationResults: entry?.components?.map((item) => item.formula ?? 'SEC filed component') ?? [],
-    warning: (entry?.warnings ?? []).join(' | '),
+    warning: [entry?.reason, ...(entry?.warnings ?? [])].filter(Boolean).join(' | '),
     failureReason: entry?.value == null ? rootCause(entry ?? {}) : null,
     documentHash: entry?.documentHash ?? snapshot.documentHash,
     lastValidatedAt: snapshot.retrievedAt,
@@ -194,7 +215,18 @@ for (const [tickerIndex, ticker] of requestedTickers.entries()) {
       companyResults.push({ ticker, company: company?.name ?? ticker, changed: false, classification: preliminaryClassification })
       for (const metric of metrics) for (const year of years) records.push({
         company: company?.name ?? ticker, ticker, cik: company?.cik ?? null, metric,
-        metricDefinition: METRIC_DEFINITIONS[metric].definition, calendarYear: year,
+        metricDefinition: AUDIT_METRIC_DEFINITIONS[metric].definition, calendarYear: `${year}A`,
+        displayedValue: null, exactness: null, validationStatus: preliminaryClassification.financialStatus,
+        primarySource: 'Not applicable', primarySourceUrl: null, secondarySource: null,
+        primarySourceValue: null, secondarySourceValue: null, sourceDifference: null,
+        quarterlyComponents: [], formula: preliminaryClassification.financialStatus,
+        reconciliationResults: [], warning: preliminaryClassification.reason,
+        failureReason: preliminaryClassification.reason, documentHash: null,
+        lastValidatedAt: new Date().toISOString(), issuerClassification: preliminaryClassification.classification,
+      })
+      for (const metric of metrics) records.push({
+        company: company?.name ?? ticker, ticker, cik: company?.cik ?? null, metric,
+        metricDefinition: AUDIT_METRIC_DEFINITIONS[metric].definition, calendarYear: 'LTM',
         displayedValue: null, exactness: null, validationStatus: preliminaryClassification.financialStatus,
         primarySource: 'Not applicable', primarySourceUrl: null, secondarySource: null,
         primarySourceValue: null, secondarySourceValue: null, sourceDifference: null,
@@ -210,6 +242,16 @@ for (const [tickerIndex, ticker] of requestedTickers.entries()) {
     const facts = await getCompanyFacts(company.cik).catch(() => null)
     const supplemental = await loadSupplementalFilingFacts({ company, filingIndex, years })
     const ledger = await buildCanonicalQuarterlyLedger({ company, facts, years, filingIndex, supplementalRawFacts: supplemental.records })
+    const production = await buildCanonicalHistoricalFinancials({
+      ticker,
+      wiseSheetsRows: wiseSheetsRows.filter((row) => String(row.ticker).toUpperCase() === ticker),
+      company,
+      facts,
+      filings: filingIndex,
+      years,
+      additionalSupplementalFacts: supplemental.records,
+    })
+    const canonical = production.canonical
     const expectedLtmEnd = latestReportedQuarterEnd(filingIndex, ledger.rawLedger)
     const changed = previousManifest[ticker] !== ledger.snapshot.documentHash
     companyResults.push({
@@ -225,26 +267,25 @@ for (const [tickerIndex, ticker] of requestedTickers.entries()) {
     if (changedOnly && !changed) continue
     for (const metric of metrics) {
       for (const year of years) {
-        const rawEntry = ledger.calendarActuals[metric]?.[year]
-        const entry = metric === 'ebitda'
+        const rawEntry = metric === 'adjustedEbitda'
+          ? ledger.calendarActuals.ebitda?.[year]
+          : canonical.calendarActuals[metric]?.[year]
+        const entry = metric === 'adjustedEbitda'
           ? failClosedAdjustedEbitda(rawEntry, ADJUSTED_EBITDA_PERIOD.CALENDAR_YEAR)
           : rawEntry
-        records.push(auditRecord({ company: company.name, ticker, cik: company.cik, metric, period: year, entry, snapshot: ledger.snapshot, classification }))
+        records.push(auditRecord({ company: company.name, ticker, cik: company.cik, metric, period: `${year}A`, entry, snapshot: ledger.snapshot, classification }))
       }
-      const ltmCandidate = metric === 'ebitda'
+      const ltmCandidate = metric === 'adjustedEbitda'
         ? failClosedAdjustedEbitda(ledger.adjustedEbitda.ltm, ADJUSTED_EBITDA_PERIOD.LTM)
-        : (() => {
-            const quarterlyLtm = calculateLtm(ledger.ledger[metric])
-            return quarterlyLtm.value != null ? quarterlyLtm : ledger.ltmFallbacks?.[metric] ?? quarterlyLtm
-          })()
-      const ltm = enforceLtmFreshness(ltmCandidate, expectedLtmEnd)
+        : canonical.ltm[metric]
+      const ltm = metric === 'adjustedEbitda' ? enforceLtmFreshness(ltmCandidate, expectedLtmEnd) : ltmCandidate
       records.push(auditRecord({ company: company.name, ticker, cik: company.cik, metric, period: 'LTM', entry: ltm, snapshot: ledger.snapshot, classification }))
     }
   } catch (error) {
     companyResults.push({ ticker, company: ticker, changed: true, error: error.message })
-    for (const metric of metrics) for (const year of years) records.push({
-      company: ticker, ticker, cik: null, metric, metricDefinition: METRIC_DEFINITIONS[metric].definition,
-      calendarYear: year, displayedValue: null, exactness: null, validationStatus: HISTORICAL_VALIDATION_STATUS.REQUIRES_REVIEW,
+    for (const metric of metrics) for (const period of [...years.map((year) => `${year}A`), 'LTM']) records.push({
+      company: ticker, ticker, cik: null, metric, metricDefinition: AUDIT_METRIC_DEFINITIONS[metric].definition,
+      calendarYear: period, displayedValue: null, exactness: null, validationStatus: HISTORICAL_VALIDATION_STATUS.REQUIRES_REVIEW,
       primarySource: 'Unavailable', primarySourceUrl: null, secondarySource: null, primarySourceValue: null,
       secondarySourceValue: null, sourceDifference: null, quarterlyComponents: [], formula: 'ingestion-failed',
       reconciliationResults: [], warning: error.message, failureReason: 'Source ingestion failure', documentHash: null,
@@ -264,7 +305,10 @@ const failuresByRootCause = Object.entries(filteredRecords.filter((record) => ![
 const sanityFlags = filteredRecords.flatMap((record) => (record.economicSanityFlags ?? []).map((flag) => ({
   ticker: record.ticker, metric: record.metric, calendarYear: record.calendarYear, ...flag,
 })))
-const report = { generatedAt: new Date().toISOString(), tickers: requestedTickers, years, metrics, changedOnly, companyResults, summary: { totalCompanies: companyResults.length, totalHistoricalNumbers: filteredRecords.length, ...counts, failuresByRootCause, economicSanityFlagCount: sanityFlags.length }, sanityFlags, records: filteredRecords }
+const auditIssues = changedOnly || statusOption ? [] : validateHistoricalAuditRecords(records, {
+  tickers: requestedTickers, metrics, periods: [...years.map((year) => `${year}A`), 'LTM'],
+})
+const report = { generatedAt: new Date().toISOString(), tickers: requestedTickers, years, metrics, changedOnly, companyResults, summary: { totalCompanies: companyResults.length, totalHistoricalNumbers: filteredRecords.length, ...counts, failuresByRootCause, economicSanityFlagCount: sanityFlags.length, auditIssueCount: auditIssues.length }, sanityFlags, auditIssues, records: filteredRecords }
 
 await mkdir(outputDirectory, { recursive: true })
 const perTickerDirectory = path.join(outputDirectory, 'by-ticker')
@@ -297,4 +341,4 @@ await Promise.all([
 ])
 
 console.log(JSON.stringify({ ...report.summary, jsonFilename, csvFilename }, null, 2))
-if (counts[HISTORICAL_VALIDATION_STATUS.MISMATCH] > 0) process.exitCode = 1
+if (counts[HISTORICAL_VALIDATION_STATUS.MISMATCH] > 0 || auditIssues.length > 0) process.exitCode = 1
