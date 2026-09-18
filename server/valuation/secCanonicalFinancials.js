@@ -427,11 +427,10 @@ function dateAuthorityRank(candidate) {
 function additiveCapexClass(candidate) {
   const text = `${candidate.concept ?? ''} ${candidate.label ?? ''}`.toLowerCase().replace(/[^a-z0-9]+/g, ' ')
   if (/\bproperty\s+plant\s+(?:and\s+)?equipment\b|\bproperty\s+and\s+equipment\b/.test(text) &&
-      /\bnet\s+of\s+computer\s+hardware\b/.test(text)) return 'PROPERTY_PLANT_EQUIPMENT'
-  if (/\bcomputer\s+hardware\b/.test(text)) return 'COMPUTER_HARDWARE'
-  if (/\bproperty\s+plant\s+(?:and\s+)?equipment\b|\bproperty\s+and\s+equipment\b/.test(text)) {
+      /\b(?:net\s+of|excluding|exclusive\s+of)\s+(?:purchases?\s+of\s+)?computer\s+hardware\b/.test(text)) {
     return 'PROPERTY_PLANT_EQUIPMENT'
   }
+  if (/\bcomputer\s+hardware\b/.test(text)) return 'COMPUTER_HARDWARE'
   return null
 }
 
@@ -469,17 +468,19 @@ function additiveCapexCandidate(candidates) {
   const eligible = candidates.filter((candidate) => dateAuthorityRank(candidate) === authority)
   const accessions = new Set(eligible.map((candidate) => candidate.accession).filter(Boolean))
   if (eligible.length < 2 || accessions.size !== 1) return null
-  if (eligible.some((candidate) => /\btotal\b|^capital expenditures?$/i.test(String(candidate.label ?? '').trim()))) return null
   const classified = eligible.map((candidate) => ({ candidate, componentClass: additiveCapexClass(candidate) }))
-  if (classified.some((item) => !item.componentClass)) return null
+    .filter((item) => item.componentClass)
+  if (classified.length < 2 || classified.some(({ candidate }) =>
+    candidate.explicitPeriodMapping !== true || !candidate.sourceId || !candidate.accession)) return null
   const byComponentClass = new Map()
   for (const item of classified) {
     if (!byComponentClass.has(item.componentClass)) byComponentClass.set(item.componentClass, [])
     byComponentClass.get(item.componentClass).push(item.candidate)
   }
-  if (byComponentClass.size < 2 || [...byComponentClass.values()].some((group) =>
+  if (byComponentClass.size !== 2 || [...byComponentClass.values()].some((group) =>
     group.some((candidate) => !valuesAgree(candidate.normalizedValue, group[0].normalizedValue)))) return null
   const components = [...byComponentClass.values()].map((group) => group[0])
+  if (new Set(components.map((candidate) => candidate.sourceId)).size !== components.length) return null
   const first = components[0]
   return {
     ...first,

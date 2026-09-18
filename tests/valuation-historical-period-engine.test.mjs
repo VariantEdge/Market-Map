@@ -343,7 +343,7 @@ test('four consecutive standalone quarters remain preferred over an available FY
   assert.equal(result.reconciliation.passed, true)
 })
 
-test('an authoritative FY/YTD bridge replaces a materially inconsistent four-quarter LTM', () => {
+test('materially inconsistent four-quarter and FY/YTD LTM constructions fail closed', () => {
   const bridge = ltmBridgeFacts('3M')
   const quarters = [
     observation({ ticker: 'BRIDGE', metric: 'ebit', start: '2024-04-01', end: '2024-06-30', value: 40,
@@ -354,10 +354,13 @@ test('an authoritative FY/YTD bridge replaces a materially inconsistent four-qua
       fiscalYear: 2024, fiscalQuarter: 4, definitionFingerprint: 'GAAP_EBIT' }),
   ]
   const result = buildLtm([...bridge, ...quarters], { asOfDate: '2026-01-01' })
-  assert.equal(result.value, 110)
-  assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
+  assert.equal(result.value, null)
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW)
+  assert.equal(result.reason, 'LTM_CONSTRUCTION_MISMATCH')
   assert.equal(result.reconciliation.passed, false)
-  assert.equal(result.reconciliation.selection, 'AUTHORITATIVE_FY_YTD_BRIDGE')
+  assert.equal(result.reconciliation.selection, 'NONE_FAIL_CLOSED')
+  assert.ok(result.components.some((item) => item.constructionCandidate === 'FOUR_QUARTERS'))
+  assert.ok(result.components.some((item) => item.constructionCandidate === 'FY_YTD_BRIDGE'))
 })
 
 test('definition compatibility is limited to the latest four LTM contributors', () => {

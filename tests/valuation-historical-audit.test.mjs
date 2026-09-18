@@ -36,6 +36,22 @@ test('historical audit accepts explicit fail-closed N/A and rejects stale generi
     .some((issue) => issue.metric === 'revenue' && issue.reason === 'UNJUSTIFIED_NULL'))
 })
 
+for (const validationStatus of [
+  'MISSING_SOURCE_DATA',
+  'INSUFFICIENT_PERIOD_COVERAGE',
+  'STALE_SOURCE_COVERAGE',
+  'REQUIRES_REVIEW',
+]) {
+  test(`historical audit fails a mandatory null with ${validationStatus}`, () => {
+    const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+    const target = records.find((item) => item.metric === 'adjustedEbitda' && item.calendarYear === 'LTM')
+    Object.assign(target, { displayedValue: null, validationStatus, quarterlyComponents: [], failureReason: validationStatus })
+    assert.ok(validateHistoricalAuditRecords(records, { tickers, metrics, periods }).some((issue) =>
+      issue.metric === 'adjustedEbitda' && issue.period === 'LTM' &&
+      issue.reason === 'MANDATORY_CELL_UNRESOLVED' && issue.status === validationStatus))
+  })
+}
+
 test('historical audit rejects values without period identity and source provenance', () => {
   const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
   records[0].quarterlyComponents = [{ sourceProvider: 'SEC', sourceId: 'missing-dates' }]

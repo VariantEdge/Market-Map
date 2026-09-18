@@ -590,8 +590,11 @@ export function buildLtm(observations = [], { asOfDate = '9999-12-31', latestRep
         },
       }
     }
-    return {
-      ...bridge,
+    return unavailable(HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW, 'LTM_CONSTRUCTION_MISMATCH', {
+      components: [
+        ...fourQuarter.components.map((component) => ({ ...component, constructionCandidate: 'FOUR_QUARTERS' })),
+        ...bridge.components.map((component) => ({ ...component, constructionCandidate: 'FY_YTD_BRIDGE' })),
+      ],
       reconciliation: {
         method: 'FOUR_QUARTERS_VS_FY_YTD_BRIDGE',
         fourQuarterValue: fourQuarter.value,
@@ -599,9 +602,9 @@ export function buildLtm(observations = [], { asOfDate = '9999-12-31', latestRep
         difference: fourQuarter.value - bridge.value,
         tolerance,
         passed: false,
-        selection: 'AUTHORITATIVE_FY_YTD_BRIDGE',
+        selection: 'NONE_FAIL_CLOSED',
       },
-    }
+    })
   }
   if (fourQuarter.value != null) return fourQuarter
   if (bridge.value != null) return bridge

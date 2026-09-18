@@ -6,11 +6,14 @@ const EXPLICIT_NULL_STATUSES = new Set([
   'OUT_OF_SCOPE',
   'OUT_OF_SEC_SCOPE',
   'ETF_NOT_APPLICABLE',
+  'DEFINITION_INCOMPATIBLE',
+  'OPERATION_SCOPE_INCOMPATIBLE',
+])
+
+const MANDATORY_FAILURE_STATUSES = new Set([
   'MISSING_SOURCE_DATA',
   'INSUFFICIENT_PERIOD_COVERAGE',
   'STALE_SOURCE_COVERAGE',
-  'DEFINITION_INCOMPATIBLE',
-  'OPERATION_SCOPE_INCOMPATIBLE',
   'REQUIRES_REVIEW',
 ])
 
@@ -52,7 +55,9 @@ export function validateHistoricalAuditRecords(records = [], { tickers = [], met
       continue
     }
     if (record.displayedValue == null) {
-      if (!EXPLICIT_NULL_STATUSES.has(record.validationStatus)) {
+      if (MANDATORY_FAILURE_STATUSES.has(record.validationStatus)) {
+        issues.push({ ticker, metric, period, reason: 'MANDATORY_CELL_UNRESOLVED', status: record.validationStatus })
+      } else if (!EXPLICIT_NULL_STATUSES.has(record.validationStatus)) {
         issues.push({ ticker, metric, period, reason: 'UNJUSTIFIED_NULL', status: record.validationStatus })
       }
       if (!record.failureReason && !record.warning) {
@@ -76,3 +81,4 @@ export function validateHistoricalAuditRecords(records = [], { tickers = [], met
 }
 
 export const HISTORICAL_AUDIT_NULL_STATUSES = EXPLICIT_NULL_STATUSES
+export const HISTORICAL_AUDIT_FAILURE_STATUSES = MANDATORY_FAILURE_STATUSES

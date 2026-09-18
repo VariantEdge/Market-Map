@@ -162,6 +162,30 @@ test('bridge accepts a stable reconciliation taxonomy when period-specific adjus
   assert.equal(build(records).value, 120_000_000)
 })
 
+test('bridge rejects a materially changed definition despite overlapping generic adjustment terms', () => {
+  const commonGenericTerms = [
+    'Adjusted EBITDA',
+    'Depreciation and amortization',
+    'Interest expense',
+    'Provision for income taxes',
+    'Stock compensation',
+  ]
+  const records = calendarBridge().map((item, index) => ({
+    ...item,
+    definitionFingerprint: `materially-changed-${index}`,
+    tableContext: {
+      ...item.tableContext,
+      rowLabels: index === 1
+        ? [...commonGenericTerms, 'Cryptocurrency remeasurement', 'Customer contract termination',
+          'Founder liquidity program', 'Asset disposal program']
+        : [...commonGenericTerms, 'Restructuring charges', 'Acquisition costs', 'Legal settlements', 'Foreign exchange'],
+    },
+  }))
+  const result = build(records)
+  assert.equal(result.value, null)
+  assert.equal(result.validationStatus, 'DEFINITION_INCOMPATIBLE')
+})
+
 test('bridge fails closed for mismatched currencies', () => {
   const records = calendarBridge()
   records[1] = { ...records[1], currency: 'EUR' }

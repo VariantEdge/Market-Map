@@ -918,6 +918,59 @@ test('distinct same-filing cash capex components are summed only when labels pro
   assert.equal(fcf.derivation.inputs[1].normalizedValue, 4_333_087_000)
 })
 
+test('generic PP&E and hardware labels are not summed without explicit non-overlap evidence', () => {
+  const accessionNumber = 'ambiguous-capex-components'
+  const common = {
+    units: 'USD', currency: 'USD', startDate: '2025-01-01', endDate: '2025-12-31',
+    periodType: 'FISCAL_YEAR', fiscalPeriod: 'FY', fiscalYear: 2025,
+    filingForm: '10-K', filingDate: '2026-02-01', accessionNumber,
+    filingUrl: 'https://www.sec.gov/ambiguous-capex-components.htm', dateAuthority: DATE_AUTHORITY.REPORTED,
+    explicitPeriodMapping: true, metricCandidates: ['capitalExpenditures'], namespace: 'testco',
+  }
+  const result = adaptSecCanonicalFinancials({
+    company,
+    facts: { cik: company.cik, facts: {} },
+    filings: { company, filings: [{ accessionNumber, filingUrl: common.filingUrl }] },
+    supplementalFacts: [
+      { ...common, id: 'generic-ppe', concept: 'PaymentsToAcquirePropertyPlantAndEquipment',
+        label: 'Payments for property, plant and equipment', value: -100 },
+      { ...common, id: 'hardware', concept: 'PurchasesOfComputerHardware',
+        label: 'Purchases of computer hardware', value: -40 },
+    ],
+    metrics: ['capitalExpenditures'],
+  })
+  assert.equal(result.observations.length, 1)
+  assert.notEqual(result.observations[0].normalizedValue, 140)
+  assert.notEqual(result.observations[0].derivation?.method, 'ADDITIVE_NON_OVERLAPPING_CASH_CAPEX_COMPONENTS')
+  assert.ok(result.observations[0].conflicts.length > 0)
+})
+
+test('explicitly separate capex labels are not summed without structural period mapping', () => {
+  const accessionNumber = 'unmapped-capex-components'
+  const common = {
+    units: 'USD', currency: 'USD', startDate: '2025-01-01', endDate: '2025-12-31',
+    periodType: 'FISCAL_YEAR', fiscalPeriod: 'FY', fiscalYear: 2025,
+    filingForm: '10-K', filingDate: '2026-02-01', accessionNumber,
+    filingUrl: 'https://www.sec.gov/unmapped-capex-components.htm', dateAuthority: DATE_AUTHORITY.REPORTED,
+    explicitPeriodMapping: false, metricCandidates: ['capitalExpenditures'], namespace: 'testco',
+  }
+  const result = adaptSecCanonicalFinancials({
+    company,
+    facts: { cik: company.cik, facts: {} },
+    filings: { company, filings: [{ accessionNumber, filingUrl: common.filingUrl }] },
+    supplementalFacts: [
+      { ...common, id: 'ppe-excluding-hardware', concept: 'PaymentsToAcquirePropertyPlantAndEquipment',
+        label: 'Payments for property, plant and equipment, net of computer hardware', value: -100 },
+      { ...common, id: 'hardware', concept: 'PurchasesOfComputerHardware',
+        label: 'Purchases of computer hardware', value: -40 },
+    ],
+    metrics: ['capitalExpenditures'],
+  })
+  assert.equal(result.observations.length, 1)
+  assert.notEqual(result.observations[0].normalizedValue, 140)
+  assert.notEqual(result.observations[0].derivation?.method, 'ADDITIVE_NON_OVERLAPPING_CASH_CAPEX_COMPONENTS')
+})
+
 test('structured cash-flow extraction recognizes a separate computer-hardware capex component', () => {
   const filing = {
     id: 'hardware-capex', immutableSourceId: 'SEC:fixture:hardware-capex', form: '20-F',
