@@ -5,9 +5,23 @@ import {
   calculateLtmFromAnnualAndYtd,
   HISTORICAL_STATUS,
 } from '../server/valuation/financialLedger.js'
-import { selectMetricSourceFacts } from '../server/valuation/sourceLedger.js'
+import {
+  isSupplementalSourceSnapshotCompatible,
+  selectMetricSourceFacts,
+  SUPPLEMENTAL_SOURCE_SCHEMA_VERSION,
+} from '../server/valuation/sourceLedger.js'
 
 const company = { name: 'Fixture Co', ticker: 'FIX', cik: '0000000001' }
+
+test('supplemental source snapshots require the current extraction schema', () => {
+  assert.equal(isSupplementalSourceSnapshotCompatible({ sourceMetadata: {} }), false)
+  assert.equal(isSupplementalSourceSnapshotCompatible({
+    sourceMetadata: { supplementalSourceSchemaVersion: SUPPLEMENTAL_SOURCE_SCHEMA_VERSION - 1 },
+  }), false)
+  assert.equal(isSupplementalSourceSnapshotCompatible({
+    sourceMetadata: { supplementalSourceSchemaVersion: SUPPLEMENTAL_SOURCE_SCHEMA_VERSION },
+  }), true)
+})
 
 function fact({ tag, start, end, value, fy = 2025, fp = 'Q1', filed = '2026-02-01', form = '10-Q' }) {
   return { tag, start, end, val: value, fy, fp, filed, form }

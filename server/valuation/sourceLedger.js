@@ -6,6 +6,7 @@ import { HISTORICAL_VALIDATION_STATUS } from './issuerClassification.js'
 const DAY_MS = 24 * 60 * 60 * 1000
 const SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000
 const latestSnapshotCache = new Map()
+export const SUPPLEMENTAL_SOURCE_SCHEMA_VERSION = 6
 const SUPPORTED_FORMS = new Set([
   '10-K', '10-K/A', '10-Q', '10-Q/A', '8-K', '8-K/A',
   '20-F', '20-F/A', '40-F', '40-F/A', '6-K',
@@ -86,12 +87,12 @@ export const METRIC_SOURCE_POLICY = Object.freeze({
   },
   operatingIncome: {
     concepts: ['OperatingIncomeLoss', 'ProfitLossFromOperatingActivities'],
-    extensionLabel: /^(?:total )?operating (?:income|profit|loss)(?: \(loss\))?$/i,
+    extensionLabel: /^(?:(?:total )?operating (?:income|profit|loss)(?: \(loss\))?|(?:income|profit|loss) from operations)$/i,
     exclude: /segment|adjusted|margin|percentage/i,
   },
   ebit: {
     concepts: ['OperatingIncomeLoss', 'ProfitLossFromOperatingActivities'],
-    extensionLabel: /^(?:total )?operating (?:income|profit|loss)(?: \(loss\))?$/i,
+    extensionLabel: /^(?:(?:total )?operating (?:income|profit|loss)(?: \(loss\))?|(?:income|profit|loss) from operations)$/i,
     exclude: /segment|adjusted|margin|percentage/i,
   },
   depreciationAmortization: {
@@ -114,7 +115,7 @@ export const METRIC_SOURCE_POLICY = Object.freeze({
   },
   operatingCashFlow: {
     concepts: ['NetCashProvidedByUsedInOperatingActivities', 'CashFlowsFromUsedInOperatingActivities', 'NetCashProvidedByUsedInContinuingOperations'],
-    extensionLabel: /^net cash (?:provided by|used in|provided by \(used in\)) operating activities(?:,? continuing operations)?$/i,
+    extensionLabel: /^net cash (?:provided by|used in|provided by\s*\/\s*\(used in\)|provided by \(used in\)) operating activities(?:(?:,? | from )continuing operations)?$/i,
     exclude: /discontinued/i,
   },
   capitalExpenditures: {
@@ -124,7 +125,7 @@ export const METRIC_SOURCE_POLICY = Object.freeze({
       'PaymentsToAcquireOtherPropertyPlantAndEquipment', 'PaymentsToAcquireOtherProductiveAssets',
       'PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities',
     ],
-    extensionLabel: /^(?:payments|purchases|capital expenditures).*(?:property|plant|equipment)|^purchases of property and equipment$/i,
+    extensionLabel: /^(?:payments|purchases|capital expenditures).*(?:property|plant|equipment|computer hardware)|^purchases of property and equipment$/i,
     exclude: /business|subsidiar|affiliate|investment|proceeds|unpaid|incurred but not/i,
   },
   adjustedEbitda: {
@@ -322,7 +323,11 @@ export function selectMetricSourceFacts(records, metric, { preferredCurrency = '
 }
 
 export async function preserveRawSourceLedger(company, records, sourceMetadata = {}) {
-  const body = JSON.stringify({ company, sourceMetadata, records })
+  const versionedSourceMetadata = {
+    ...sourceMetadata,
+    supplementalSourceSchemaVersion: SUPPLEMENTAL_SOURCE_SCHEMA_VERSION,
+  }
+  const body = JSON.stringify({ company, sourceMetadata: versionedSourceMetadata, records })
   const documentHash = sha256(body)
   const directory = path.join(process.cwd(), '.cache', 'financial-source-ledger', String(company.cik))
   const filename = `${documentHash}.json`
@@ -339,6 +344,10 @@ export async function preserveRawSourceLedger(company, records, sourceMetadata =
     snapshotPath: path.join('.cache', 'financial-source-ledger', String(company.cik), filename),
     retrievedAt: sourceMetadata.retrievedAt ?? new Date().toISOString(),
   }
+}
+
+export function isSupplementalSourceSnapshotCompatible(snapshot) {
+  return snapshot?.sourceMetadata?.supplementalSourceSchemaVersion === SUPPLEMENTAL_SOURCE_SCHEMA_VERSION
 }
 
 export async function loadLatestSupplementalSourceFacts(company, options = {}) {
@@ -363,6 +372,7 @@ export async function loadLatestSupplementalSourceFacts(company, options = {}) {
       if (Date.now() - candidate.modifiedAt > maxAgeMs) break
       try {
         const snapshot = JSON.parse(await readFile(candidate.filePath, 'utf8'))
+        if (!isSupplementalSourceSnapshotCompatible(snapshot)) continue
         const records = (snapshot.records ?? []).filter((record) =>
           record.rawSourceType && record.rawSourceType !== 'SEC_COMPANY_FACTS')
         if (!records.length) continue

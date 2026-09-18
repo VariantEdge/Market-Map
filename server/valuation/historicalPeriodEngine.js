@@ -339,6 +339,70 @@ function bridgeComponent(observation, role, sign) {
   }
 }
 
+function exactDerivedAnnualObservation(observation) {
+  if (observation.reportedVsDerived !== 'DERIVED' ||
+      observation.derivation?.exactness !== 'EXACT_ARITHMETIC' ||
+      !['REVENUE_MINUS_COST_OF_REVENUE', 'CFO_MINUS_CAPEX',
+        'ADDITIVE_NON_OVERLAPPING_CASH_CAPEX_COMPONENTS'].includes(observation.derivation?.method)) return false
+  const inputs = observation.derivation?.inputs
+  const period = observation.periodIdentity
+  return Array.isArray(inputs) && inputs.length >= 2 && inputs.every((input) =>
+    input.issuerId === observation.issuerId && input.scope === observation.scope &&
+    input.operationScope === observation.operationScope && input.currency === observation.currency &&
+    input.normalizedUnits === observation.normalizedUnits && input.reportedVsDerived !== 'CALENDARIZED_ESTIMATE' &&
+    input.classification !== CY_CLASSIFICATION.CALENDARIZED_ESTIMATE && input.derivation?.exactness !== 'ESTIMATED' &&
+    input.derivation?.method !== 'CALENDARIZED_ESTIMATE' &&
+    input.periodIdentity?.periodStart === period.periodStart && input.periodIdentity?.periodEnd === period.periodEnd &&
+    [DATE_AUTHORITY.REPORTED, DATE_AUTHORITY.DERIVED_FROM_REPORTED_BOUNDARIES]
+      .includes(input.periodIdentity?.dateAuthority) && input.deduplicationStatus !== 'REQUIRES_REVIEW')
+}
+
+function buildDirectAnnualLtm(observations, { asOfDate, latestReportedPeriod }) {
+  const latestObservationEnd = observations
+    .filter((item) => item.periodIdentity?.periodEnd && item.periodIdentity.periodEnd <= asOfDate)
+    .map((item) => item.periodIdentity.periodEnd).sort().at(-1) ?? null
+  const annuals = observations.filter((item) => {
+    const period = item.periodIdentity
+    return [PERIOD_TYPE.FISCAL_YEAR, PERIOD_TYPE.CALENDAR_YEAR].includes(period.periodType) &&
+      hasAuthoritativeBoundaries(period) && period.periodEnd <= asOfDate &&
+      period.durationDays >= 350 && period.durationDays <= 378 &&
+      (item.reportedVsDerived === 'REPORTED' || exactDerivedAnnualObservation(item))
+  }).sort((left, right) => right.periodIdentity.periodEnd.localeCompare(left.periodIdentity.periodEnd))
+  if (!annuals.length) return unavailable(HISTORICAL_RESULT_STATUS.MISSING_SOURCE_DATA,
+    'LATEST_VERIFIED_FULL_YEAR_UNAVAILABLE')
+  const latestEnd = annuals[0].periodIdentity.periodEnd
+  if (latestObservationEnd && latestEnd < latestObservationEnd) {
+    return unavailable(HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE,
+      'LATEST_FULL_YEAR_PRECEDES_LATEST_OBSERVATION')
+  }
+  const candidates = annuals.filter((item) => item.periodIdentity.periodEnd === latestEnd)
+  if (latestReportedPeriod?.valid && latestEnd < latestReportedPeriod.periodEnd) {
+    return unavailable(HISTORICAL_RESULT_STATUS.STALE_SOURCE_COVERAGE, 'LATEST_REPORTED_PERIOD_NOT_INGESTED', {
+      latestIngestedPeriod: latestEnd,
+      latestReportedPeriod,
+    })
+  }
+  if (candidates.length !== 1) return unavailable(HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW,
+    'DUPLICATE_LATEST_FULL_YEAR')
+  const item = candidates[0]
+  if (item.scope !== 'CONSOLIDATED') return unavailable(HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW,
+    'NON_CONSOLIDATED_SCOPE')
+  if (item.deduplicationStatus === 'REQUIRES_REVIEW') return unavailable(HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW,
+    item.conflicts?.[0]?.type ?? 'DEDUPLICATION_CONFLICT')
+  return {
+    value: item.normalizedValue,
+    classification: 'LTM',
+    status: item.reportedVsDerived === 'REPORTED'
+      ? HISTORICAL_RESULT_STATUS.VERIFIED_REPORTED
+      : HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED,
+    reason: null,
+    derivation: 'LATEST_VERIFIED_FULL_YEAR',
+    components: [sourceComponent({ observation: item, overlapStart: null, overlapEnd: null }, false)],
+    latestIngestedPeriod: latestEnd,
+    latestReportedPeriod: latestReportedPeriod?.valid ? latestReportedPeriod : null,
+  }
+}
+
 function ltmBridgeResult(observations, { asOfDate, latestReportedPeriod }) {
   const eligible = observations.filter((item) => hasAuthoritativeBoundaries(item.periodIdentity) &&
     item.periodIdentity.periodEnd <= asOfDate && item.normalizedValue != null)
@@ -507,9 +571,39 @@ function buildFourQuarterLtm(observations, { asOfDate, latestReportedPeriod }) {
 
 export function buildLtm(observations = [], { asOfDate = '9999-12-31', latestReportedPeriod = null } = {}) {
   const deduped = deduplicateEconomicPeriods(observations)
+  const directAnnual = buildDirectAnnualLtm(deduped, { asOfDate, latestReportedPeriod })
+  if (directAnnual.value != null) return directAnnual
   const fourQuarter = buildFourQuarterLtm(deduped, { asOfDate, latestReportedPeriod })
-  if (fourQuarter.value != null) return fourQuarter
   const bridge = ltmBridgeResult(deduped, { asOfDate, latestReportedPeriod })
+  if (fourQuarter.value != null && bridge.value != null) {
+    const tolerance = Math.max(1, Math.abs(bridge.value) * 0.005)
+    if (Math.abs(fourQuarter.value - bridge.value) <= tolerance) {
+      return {
+        ...fourQuarter,
+        reconciliation: {
+          method: 'FOUR_QUARTERS_VS_FY_YTD_BRIDGE',
+          fourQuarterValue: fourQuarter.value,
+          bridgeValue: bridge.value,
+          difference: fourQuarter.value - bridge.value,
+          tolerance,
+          passed: true,
+        },
+      }
+    }
+    return {
+      ...bridge,
+      reconciliation: {
+        method: 'FOUR_QUARTERS_VS_FY_YTD_BRIDGE',
+        fourQuarterValue: fourQuarter.value,
+        bridgeValue: bridge.value,
+        difference: fourQuarter.value - bridge.value,
+        tolerance,
+        passed: false,
+        selection: 'AUTHORITATIVE_FY_YTD_BRIDGE',
+      },
+    }
+  }
+  if (fourQuarter.value != null) return fourQuarter
   if (bridge.value != null) return bridge
   if ([HISTORICAL_RESULT_STATUS.DEFINITION_INCOMPATIBLE,
     HISTORICAL_RESULT_STATUS.OPERATION_SCOPE_INCOMPATIBLE,

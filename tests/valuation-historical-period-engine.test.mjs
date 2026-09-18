@@ -240,6 +240,39 @@ test('LTM uses the latest four unique consecutive quarters and rejects a gap', (
   assert.equal(buildLtm(gap, { asOfDate: '2025-04-01' }).reason, 'LTM_PERIOD_GAP')
 })
 
+test('LTM uses the latest authoritative full fiscal year when it is the trailing annual period', () => {
+  const annual = observation({
+    ticker: 'JUNECO', metric: 'capitalExpenditures', type: PERIOD_TYPE.FISCAL_YEAR,
+    start: '2025-07-01', end: '2026-06-30', value: 4_333_087_000,
+    fiscalYear: 2026, definitionFingerprint: 'CASH_CAPEX',
+  })
+  const result = buildLtm([annual], { asOfDate: '2026-09-01' })
+  assert.equal(result.value, 4_333_087_000)
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.VERIFIED_REPORTED)
+  assert.equal(result.derivation, 'LATEST_VERIFIED_FULL_YEAR')
+})
+
+test('LTM accepts an exact-derived latest annual while rejecting estimated annual arithmetic', () => {
+  const inputs = [2_998_006_000, 1_335_081_000].map((value) => ({
+    issuerId: 'JUNECO-ISSUER', scope: 'CONSOLIDATED', operationScope: 'UNSPECIFIED', currency: 'USD',
+    normalizedUnits: 'USD', normalizedValue: value, reportedVsDerived: 'REPORTED', deduplicationStatus: null,
+    periodIdentity: { periodStart: '2025-07-01', periodEnd: '2026-06-30', dateAuthority: DATE_AUTHORITY.REPORTED },
+  }))
+  const exact = observation({
+    ticker: 'JUNECO', metric: 'capitalExpenditures', type: PERIOD_TYPE.FISCAL_YEAR,
+    start: '2025-07-01', end: '2026-06-30', value: 4_333_087_000, fiscalYear: 2026,
+    reportedVsDerived: OBSERVATION_BASIS.DERIVED, definitionFingerprint: 'CASH_CAPEX',
+    derivation: { method: 'ADDITIVE_NON_OVERLAPPING_CASH_CAPEX_COMPONENTS', exactness: 'EXACT_ARITHMETIC', inputs },
+  })
+  const result = buildLtm([exact], { asOfDate: '2026-09-01' })
+  assert.equal(result.value, 4_333_087_000)
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED)
+  assert.equal(result.derivation, 'LATEST_VERIFIED_FULL_YEAR')
+
+  const estimated = { ...exact, derivation: { ...exact.derivation, exactness: 'ESTIMATED' } }
+  assert.equal(buildLtm([estimated], { asOfDate: '2026-09-01' }).value, null)
+})
+
 for (const kind of ['3M', '6M', '9M']) {
   test(`LTM falls back to an exact FY plus current ${kind} minus prior comparable ${kind} bridge`, () => {
     const result = buildLtm(ltmBridgeFacts(kind), { asOfDate: '2026-01-01' })
@@ -296,6 +329,23 @@ test('stale bridge YTD fails closed against the latest reported period', () => {
 test('four consecutive standalone quarters remain preferred over an available FY/YTD bridge', () => {
   const bridge = ltmBridgeFacts('3M')
   const quarters = [
+    observation({ ticker: 'BRIDGE', metric: 'ebit', start: '2024-04-01', end: '2024-06-30', value: 20,
+      fiscalYear: 2024, fiscalQuarter: 2, definitionFingerprint: 'GAAP_EBIT' }),
+    observation({ ticker: 'BRIDGE', metric: 'ebit', start: '2024-07-01', end: '2024-09-30', value: 30,
+      fiscalYear: 2024, fiscalQuarter: 3, definitionFingerprint: 'GAAP_EBIT' }),
+    observation({ ticker: 'BRIDGE', metric: 'ebit', start: '2024-10-01', end: '2024-12-31', value: 30,
+      fiscalYear: 2024, fiscalQuarter: 4, definitionFingerprint: 'GAAP_EBIT' }),
+  ]
+  const result = buildLtm([...bridge, ...quarters], { asOfDate: '2026-01-01' })
+  assert.equal(result.value, 110)
+  assert.equal(result.derivation, undefined)
+  assert.equal(result.components.length, 4)
+  assert.equal(result.reconciliation.passed, true)
+})
+
+test('an authoritative FY/YTD bridge replaces a materially inconsistent four-quarter LTM', () => {
+  const bridge = ltmBridgeFacts('3M')
+  const quarters = [
     observation({ ticker: 'BRIDGE', metric: 'ebit', start: '2024-04-01', end: '2024-06-30', value: 40,
       fiscalYear: 2024, fiscalQuarter: 2, definitionFingerprint: 'GAAP_EBIT' }),
     observation({ ticker: 'BRIDGE', metric: 'ebit', start: '2024-07-01', end: '2024-09-30', value: 50,
@@ -304,9 +354,10 @@ test('four consecutive standalone quarters remain preferred over an available FY
       fiscalYear: 2024, fiscalQuarter: 4, definitionFingerprint: 'GAAP_EBIT' }),
   ]
   const result = buildLtm([...bridge, ...quarters], { asOfDate: '2026-01-01' })
-  assert.equal(result.value, 180)
-  assert.equal(result.derivation, undefined)
-  assert.equal(result.components.length, 4)
+  assert.equal(result.value, 110)
+  assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
+  assert.equal(result.reconciliation.passed, false)
+  assert.equal(result.reconciliation.selection, 'AUTHORITATIVE_FY_YTD_BRIDGE')
 })
 
 test('definition compatibility is limited to the latest four LTM contributors', () => {

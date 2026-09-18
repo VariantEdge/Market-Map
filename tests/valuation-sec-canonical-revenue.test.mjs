@@ -203,9 +203,9 @@ test('off-calendar SEC quarters flow through common overlap calendarization', ()
 test('comparison exposes source split, freshness, and SEC completion status', () => {
   const facts = companyFacts([
     secFact({ start: '2024-01-01', end: '2024-03-31', value: 100, fp: 'Q1' }),
-    secFact({ start: '2024-04-01', end: '2024-06-30', value: 150, fp: 'Q2' }),
-    secFact({ start: '2024-07-01', end: '2024-09-30', value: 200, fp: 'Q3' }),
-    secFact({ start: '2024-10-01', end: '2024-12-31', value: 250, fp: 'Q4', form: '10-K' }),
+    secFact({ start: '2024-04-01', end: '2024-06-30', value: 150, fp: 'Q2', filed: '2024-08-01' }),
+    secFact({ start: '2024-07-01', end: '2024-09-30', value: 200, fp: 'Q3', filed: '2024-11-01' }),
+    secFact({ start: '2024-10-01', end: '2024-12-31', value: 250, fp: 'Q4', form: '10-K', filed: '2025-01-31' }),
   ])
   const canonical = buildSecEnrichedRevenueShadow({
     ticker: company.ticker, company, facts, wiseSheetsRows: [], years: [2024], asOfDate: '2025-02-01',

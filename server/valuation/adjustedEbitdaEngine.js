@@ -65,11 +65,14 @@ function factPeriodKey(record) {
 function normalizedDefinitionTerms(fact) {
   const ignored = /^(?:adjusted ebitda|adjusted net profit|revenue|net (?:income|loss|profit)|q[1-4]'?\d{2}|three months ended)/i
   return new Set((fact.tableContext?.rowLabels ?? [])
+    .filter((label) => String(label).length <= 180)
     .map((label) => String(label).toLowerCase()
       .replace(/\b(?:add back|add|less|deduct)\s*:?/g, '')
-      .replace(/\b(?:expense|expenses|income|loss|gain|provision|benefit|net)\b/g, '')
-      .replace(/[^a-z]+/g, ' ').trim())
-    .filter((label) => label && !ignored.test(label)))
+      .replace(/(?:\s*\([a-f]\))+\s*$/g, '')
+      .replace(/\b(?:expense|expenses|income|loss|losses|gain|gains|provision|provisions|benefit|benefits|net)\b/g, '')
+      .replace(/[^a-z]+/g, ' ').trim()
+      .replace(/\s+[a-f](?:\s+[a-f])?\s*$/g, '').trim())
+    .filter((label) => label.length > 1 && !ignored.test(label)))
 }
 
 function definitionsCompatible(facts) {
@@ -79,7 +82,7 @@ function definitionsCompatible(facts) {
   return sets.every((right, index) => {
     if (!index) return true
     const left = sets[index - 1]
-    if (left.size < 12 || right.size < 12) return false
+    if (left.size < 5 || right.size < 5) return false
     const intersection = [...left].filter((term) => right.has(term)).length
     return intersection / Math.min(left.size, right.size) >= 0.85
   })

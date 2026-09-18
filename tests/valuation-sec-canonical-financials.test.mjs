@@ -219,6 +219,9 @@ test('EBIT accepts IFRS operating profit and a clear extension but rejects adjus
         ConsolidatedOperatingProfit: { label: 'Operating profit', units: { USD: [
           fact('2024-01-01', '2024-12-31', 40, { ...annual, fy: 2024, accn: 'extension-ebit' }),
         ] } },
+        LossFromOperations: { label: 'Loss from operations', units: { USD: [
+          fact('2025-01-01', '2025-12-31', -45, { ...annual, fy: 2025, accn: 'loss-from-operations' }),
+        ] } },
         AdjustedOperatingIncome: { label: 'Adjusted operating income', units: { USD: [
           fact('2025-01-01', '2025-12-31', 50, { ...annual, fy: 2025, accn: 'adjusted-rejected' }),
         ] } },
@@ -231,7 +234,7 @@ test('EBIT accepts IFRS operating profit and a clear extension but rejects adjus
     },
   }
   const result = adaptSecCanonicalFinancials({ company, facts, metrics: ['ebit'] })
-  assert.deepEqual(result.observations.map((item) => item.normalizedValue), [30, 40])
+  assert.deepEqual(result.observations.map((item) => item.normalizedValue), [30, 40, -45])
 })
 
 test('selected restatement supplies value and fiscal metadata from the same latest observation', () => {
@@ -263,6 +266,19 @@ test('as-of filter rejects facts and reported periods not public by the requeste
   assert.deepEqual(result.observations.map((item) => item.normalizedValue), [100])
   const latest = resolveLatestReportedFinancialPeriod('revenue', result.observations, filings, '2024-06-01')
   assert.equal(latest.periodEnd, '2024-03-31')
+})
+
+test('latest reported period rejects a financial-table period ending after its filing date', () => {
+  const observations = [{
+    metric: 'ebit', form: '10-Q', filingDate: '2026-07-23', sourceId: 'forecast-column',
+    periodIdentity: { periodEnd: '2026-12-31' },
+  }, {
+    metric: 'ebit', form: '10-Q', filingDate: '2026-07-23', sourceId: 'reported-h1',
+    periodIdentity: { periodEnd: '2026-06-30' },
+  }]
+  const latest = resolveLatestReportedFinancialPeriod('ebit', observations, null, '2026-09-17')
+  assert.equal(latest.periodEnd, '2026-06-30')
+  assert.equal(latest.sourceId, 'reported-h1')
 })
 
 test('targeted 8-K loader accepts an explicit XBRL duration context and does not use filing date as period end', async () => {
@@ -660,6 +676,42 @@ test('continuing-operations CFO wins over a total that includes discontinued ope
   assert.equal(result.observations.find((item) => item.metric === 'capitalExpenditures').operationScope, OPERATION_SCOPE.UNSPECIFIED)
 })
 
+test('structured cash-flow tables accept an explicit from-continuing-operations CFO row', () => {
+  const filing = {
+    id: 'continuing-cfo', immutableSourceId: 'SEC:fixture:continuing-cfo', form: '6-K',
+    accessionNumber: 'continuing-cfo', filingDate: '2026-08-12', reportDate: '2026-06-30',
+    filingUrl: 'https://www.sec.gov/continuing-cfo.htm',
+  }
+  const html = `<p>USD millions</p><table>
+    <tr><th>Metric</th><th>Six months ended June 30, 2026</th></tr>
+    <tr><td>Net cash provided by operating activities from continuing operations</td><td>4,900.0</td></tr>
+  </table>`
+  const supplementalFacts = extractStructuredFinancialTableFacts({ company, filing, html })
+  const result = adaptSecCanonicalFinancials({ company, facts: { facts: {} }, filings: { filings: [filing] },
+    supplementalFacts, metrics: ['operatingCashFlow'] })
+  assert.equal(result.observations[0].normalizedValue, 4_900_000_000)
+  assert.equal(result.observations[0].operationScope, OPERATION_SCOPE.CONTINUING_OPERATIONS)
+})
+
+test('an explicit cash-flow scope sentence applies to a slash-form operating-cash-flow row', () => {
+  const filing = {
+    id: 'scoped-cfo', immutableSourceId: 'SEC:fixture:scoped-cfo', form: '6-K',
+    accessionNumber: 'scoped-cfo', filingDate: '2026-08-12', reportDate: '2026-06-30',
+    filingUrl: 'https://www.sec.gov/scoped-cfo.htm',
+  }
+  const html = `<p>USD millions</p><p>Set out below is a summary of cash flows from continuing operations for the six months ended June 30, 2025 and 2026.</p><table>
+    <tr><th>Metric</th><th>Six months ended June 30, 2025</th><th>Six months ended June 30, 2026</th></tr>
+    <tr><td>Net cash provided by / (used in) operating activities</td><td>(352.0)</td><td>4,504.1</td></tr>
+  </table>`
+  const supplementalFacts = extractStructuredFinancialTableFacts({ company, filing, html })
+  const result = adaptSecCanonicalFinancials({ company, facts: { facts: {} }, filings: { filings: [filing] },
+    supplementalFacts, metrics: ['operatingCashFlow'] })
+  assert.deepEqual(result.observations.map((item) => [item.normalizedValue, item.operationScope]), [
+    [-352_000_000, OPERATION_SCOPE.CONTINUING_OPERATIONS],
+    [4_504_100_000, OPERATION_SCOPE.CONTINUING_OPERATIONS],
+  ])
+})
+
 test('continuing CFO and unspecified capex fail FCF closed by operation scope', () => {
   const annual = { fp: 'FY', form: '20-F', filed: '2026-04-30', accn: 'scope-test' }
   const facts = factsByConcept({
@@ -730,6 +782,9 @@ test('generic SEC table shapes produce exact NBIS-shaped annual GP and four-quar
       <tr><th></th><th>2023</th><th>2024</th><th>2025</th></tr>
       <tr><td>Revenue</td><td>9.8</td><td>91.5</td><td>529.8</td></tr>
       <tr><td>Cost of revenue</td><td>19.6</td><td>43.7</td><td>166.2</td></tr></table>
+    <table><tr><th>Expense allocation</th><th>2023</th><th>2024</th><th>2025</th></tr>
+      <tr><td>Cost of revenue</td><td>0.1</td><td>0.3</td><td>1.2</td></tr>
+      <tr><td>Sales and marketing</td><td>0.2</td><td>0.4</td><td>0.8</td></tr></table>
     <table><tr><th>Metric</th><th>Three months ended September 30</th><th>Three months ended December 31</th><th>Three months ended March 31</th><th>Three months ended June 30</th></tr>
       <tr><th></th><th>2025</th><th>2025</th><th>2026</th><th>2026</th></tr>
       <tr><td>Revenue</td><td>146.1</td><td>227.7</td><td>399.0</td><td>582.3</td></tr></table></body>`
@@ -744,6 +799,25 @@ test('generic SEC table shapes produce exact NBIS-shaped annual GP and four-quar
   assert.equal(result.calendarActuals.grossProfit[2025].value, 363_600_000)
   assert.equal(result.ltm.revenue.value, 1_355_100_000)
   assert.equal(result.ltm.revenue.status, HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED)
+})
+
+test('standalone operating cost tables remain eligible while expense allocations are excluded', () => {
+  const filing = {
+    id: 'cost-tables', form: '6-K', accessionNumber: 'cost-tables', filingDate: '2026-08-12',
+    reportDate: '2026-06-30', filingUrl: 'https://www.sec.gov/cost-tables.htm',
+    immutableSourceId: 'SEC:1:cost-tables',
+  }
+  const html = `<body><p>USD millions</p>
+    <h2>Operating costs and expenses</h2>
+    <table><tr><th>Metric</th><th>Six months ended June 30, 2025</th><th>Six months ended June 30, 2026</th></tr>
+      <tr><td>Cost of revenues</td><td>54.8</td><td>237.4</td></tr></table>
+    <h2>Share-based compensation expense allocation</h2>
+    <table><tr><th colspan="3">Share-based compensation expense included within:</th></tr>
+      <tr><th>Metric</th><th>Six months ended June 30, 2025</th><th>Six months ended June 30, 2026</th></tr>
+      <tr><td>Cost of revenues</td><td>0.3</td><td>1.2</td></tr></table></body>`
+  const facts = extractStructuredFinancialTableFacts({ company, filing, html })
+    .filter((item) => item.metricCandidates.includes('costOfRevenue'))
+  assert.deepEqual(facts.map((item) => item.value).sort((a, b) => a - b), [54_800_000, 237_400_000])
 })
 
 test('ambiguous Cost of Revenue concepts fail Gross Profit derivation closed', () => {
@@ -815,8 +889,10 @@ test('distinct same-filing cash capex components are summed only when labels pro
     explicitPeriodMapping: true, metricCandidates: ['capitalExpenditures'], namespace: 'iren',
   }
   const supplementalFacts = [
+    { ...common, id: 'ppe-xbrl', namespace: 'us-gaap', concept: 'PaymentsToAcquirePropertyPlantAndEquipment',
+      label: 'Payments to acquire property, plant and equipment', value: -2_998_006_000 },
     { ...common, id: 'ppe', concept: 'PaymentsToAcquirePropertyPlantAndEquipment',
-      label: 'Purchases of property, plant and equipment', value: -2_998_006_000 },
+      label: 'Payments for property, plant and equipment, net of computer hardware', value: -2_998_006_000 },
     { ...common, id: 'hardware', concept: 'PurchasesOfComputerHardware',
       label: 'Purchases of computer hardware', value: -1_335_081_000 },
   ]
@@ -840,6 +916,23 @@ test('distinct same-filing cash capex components are summed only when labels pro
   assert.deepEqual(capex.derivation.componentClasses, ['PROPERTY_PLANT_EQUIPMENT', 'COMPUTER_HARDWARE'])
   assert.equal(fcf.normalizedValue, -2_232_669_000)
   assert.equal(fcf.derivation.inputs[1].normalizedValue, 4_333_087_000)
+})
+
+test('structured cash-flow extraction recognizes a separate computer-hardware capex component', () => {
+  const filing = {
+    id: 'hardware-capex', immutableSourceId: 'SEC:fixture:hardware-capex', form: '20-F',
+    accessionNumber: 'hardware-capex', filingDate: '2026-08-27', reportDate: '2026-06-30',
+    filingUrl: 'https://www.sec.gov/hardware-capex.htm',
+  }
+  const html = `<p>USD thousands</p><table>
+    <tr><th>Metric</th><th>Year ended June 30, 2026</th></tr>
+    <tr><td>Payments for property, plant and equipment, net of computer hardware</td><td>(2,998,006)</td></tr>
+    <tr><td>Payments for computer hardware</td><td>(1,335,081)</td></tr>
+  </table>`
+  const supplementalFacts = extractStructuredFinancialTableFacts({
+    company: { ...company, fiscalYearEnd: '0630' }, filing, html,
+  }).filter((item) => item.metricCandidates.includes('capitalExpenditures'))
+  assert.deepEqual(supplementalFacts.map((item) => item.value), [-2_998_006_000, -1_335_081_000])
 })
 
 test('ambiguous capex concepts remain a conflict and are never blindly summed', () => {

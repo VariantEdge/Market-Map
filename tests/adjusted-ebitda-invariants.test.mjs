@@ -183,6 +183,60 @@ test('supplemental selection always retains the latest reported quarter inside t
   assert.ok(selected.some((item) => item.accessionNumber === 'latest-quarter'))
 })
 
+test('maps an explicit year in an adjacent header cell across SEC spacer columns', () => {
+  const facts = extract(`<p>($ in millions)</p><table>
+    <tr><th></th><th colspan="3">Three months ended July 31,</th><th></th><th colspan="4">Nine months ended July 31,</th></tr>
+    <tr><th></th><th>2026</th><th></th><th>2025</th><th></th><th>2026</th><th colspan="2"></th><th>2025</th></tr>
+    <tr><td>Net loss</td><td>(10)</td><td></td><td>(11)</td><td></td><td>(20)</td><td></td><td>(21)</td></tr>
+    <tr><td>Depreciation</td><td>1</td><td></td><td>1</td><td></td><td>2</td><td></td><td>2</td></tr>
+    <tr><td>Stock-based compensation</td><td>1</td><td></td><td>1</td><td></td><td>2</td><td></td><td>2</td></tr>
+    <tr><td>Adjusted EBITDA</td><td>(8)</td><td></td><td>(9)</td><td></td><td>(16)</td><td></td><td>(17)</td></tr>
+  </table>`)
+  assert.deepEqual(facts.map((fact) => [fact.periodType, fact.endDate, fact.value]), [
+    ['QUARTER', '2026-07-31', -8_000_000],
+    ['QUARTER', '2025-07-31', -9_000_000],
+    ['YTD_9M', '2026-07-31', -16_000_000],
+    ['YTD_9M', '2025-07-31', -17_000_000],
+  ])
+})
+
+test('accepts a structurally complete reconciliation whose adjustment rows omit Add or Less prefixes', () => {
+  const quarterlyFiling = { ...filing, reportDate: '2026-04-30' }
+  const html = `<p>Non-GAAP measures ($ in thousands)</p><table>
+    <tr><th>Metric</th><th colspan="2">Three Months Ended April 30</th><th colspan="2">Six Months Ended April 30</th></tr>
+    <tr><th></th><th>2026</th><th>2025</th><th>2026</th><th>2025</th></tr>
+    <tr><td>Net loss</td><td>(77,629)</td><td>(37,749)</td><td>(103,680)</td><td>(70,135)</td></tr>
+    <tr><td>Depreciation and amortization</td><td>10,842</td><td>10,890</td><td>21,360</td><td>20,836</td></tr>
+    <tr><td>Interest expense</td><td>2,859</td><td>2,548</td><td>5,617</td><td>5,155</td></tr>
+    <tr><td>Stock-based compensation expense</td><td>2,628</td><td>4,824</td><td>5,020</td><td>6,966</td></tr>
+    <tr><td>Adjusted EBITDA</td><td>(17,056)</td><td>(19,310)</td><td>(34,086)</td><td>(40,383)</td></tr>
+  </table>`
+  const facts = extractStructuredNonGaapTableFacts({ company, filing: quarterlyFiling, html })
+  assert.deepEqual(facts.map((fact) => [fact.value, fact.periodType, fact.startDate, fact.endDate]), [
+    [-17_056_000, 'QUARTER', '2026-02-01', '2026-04-30'],
+    [-19_310_000, 'QUARTER', '2025-02-01', '2025-04-30'],
+    [-34_086_000, 'YTD_6M', '2025-11-01', '2026-04-30'],
+    [-40_383_000, 'YTD_6M', '2024-11-01', '2025-04-30'],
+  ])
+})
+
+test('annual companion selection prioritizes the current report closest to the annual filing date', () => {
+  const filing = (form, filingDate, reportDate, accessionNumber) => ({
+    form, filingDate, reportDate, accessionNumber,
+    filingUrl: `https://www.sec.gov/Archives/${accessionNumber}`,
+  })
+  const filings = [
+    filing('10-K', '2025-12-18', '2025-10-31', 'annual-2025'),
+    ...Array.from({ length: 8 }, (_, index) => filing('8-K', `2025-11-${String(index + 1).padStart(2, '0')}`,
+      `2025-11-${String(index + 1).padStart(2, '0')}`, `older-${index}`)),
+    filing('8-K', '2025-12-18', '2025-10-31', 'same-day-earnings'),
+  ]
+  const selected = selectSupplementalFilings({
+    filingIndex: { company: { cik: '0000886128' }, filings }, years: [2025], maxFilings: 5,
+  })
+  assert.ok(selected.some((item) => item.accessionNumber === 'same-day-earnings'))
+})
+
 test('extracts reported revenue quarters and YTD values from a foreign issuer SEC earnings table', () => {
   const html = `
     <p>Unaudited Condensed Consolidated Statements of Operations</p>

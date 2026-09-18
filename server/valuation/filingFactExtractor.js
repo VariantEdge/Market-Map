@@ -210,6 +210,16 @@ function contextualPeriodEnd(context, year) {
   return null
 }
 
+function explicitHeaderCell(grid, headerRow, columnIndex, periodCellCount) {
+  const direct = grid[headerRow]?.[columnIndex]
+  if (direct?.text || periodCellCount < 2) return direct
+  const yearPattern = /\b20\d{2}(?:A)?\b|\bQ[1-4]\b|\b[1-4]Q\b/i
+  const left = grid[headerRow]?.[columnIndex - 1]
+  if (left?.text && yearPattern.test(left.text)) return left
+  const right = grid[headerRow]?.[columnIndex + 1]
+  return right?.text && yearPattern.test(right.text) ? right : direct
+}
+
 function periodFromHeaders(headers, company, filing, context = '') {
   const labels = [...new Set(headers.map(normalizedCellText).filter(Boolean))]
   const combined = labels.join(' | ')
@@ -338,12 +348,13 @@ function statementWideOperationScope($, table) {
   for (let index = 0; index < 3 && cursor.length; index += 1) {
     const text = normalizedCellText(cursor.text())
     const headingElement = cursor.is('h1,h2,h3,h4,h5,h6') ||
-      (text.length <= 200 && cursor.find('strong,b').length > 0)
+      (text.length <= 200 && cursor.find('strong,b').length > 0) ||
+      (text.length <= 250 && /\bsummary of cash flows from continuing operations\b/i.test(text))
     if (headingElement) headings.unshift(text)
     cursor = cursor.prev()
   }
   const heading = normalizedCellText(headings.join(' '))
-  const scopedHeading = /\b(?:continuing\s+operations.{0,80}(?:consolidated\s+)?(?:statements?\s+of\s+(?:income|operations|cash\s+flows?)|(?:financial\s+)?results)|(?:consolidated\s+)?(?:statements?\s+of\s+(?:income|operations|cash\s+flows?)|(?:financial\s+)?results).{0,80}continuing\s+operations)\b/i
+  const scopedHeading = /\b(?:summary of cash flows from continuing operations|continuing\s+operations.{0,80}(?:consolidated\s+)?(?:statements?\s+of\s+(?:income|operations|cash\s+flows?)|(?:financial\s+)?results)|(?:consolidated\s+)?(?:statements?\s+of\s+(?:income|operations|cash\s+flows?)|(?:financial\s+)?results).{0,80}continuing\s+operations)\b/i
   return scopedHeading.test(heading)
     ? 'continuing operations'
     : null
@@ -405,9 +416,11 @@ export function extractStructuredNonGaapTableFacts({
       .find((cell) => cell.text && tableNumber(cell.text) == null)?.text)
       .filter(Boolean)
     const combinedContext = `${context} ${tableText}`
+    const adjustmentRows = rowLabels.filter((label) =>
+      /^(?:add|less|deduct):?/i.test(label) ||
+      /^(?:depreciation|amortization|interest|income taxes?|provision|benefit|stock-based compensation|impairment|restructuring|unrealized (?:loss|gain))/i.test(label))
     const reconciliationContext = /reconciliation/i.test(combinedContext) ||
-      (rowLabels.some((label) => /^net (?:income|loss)(?: \(loss\))?/i.test(label)) &&
-       rowLabels.filter((label) => /^(?:add|less|deduct):?/i.test(label)).length >= 2)
+      (rowLabels.some((label) => /^net (?:income|loss)(?: \(loss\))?/i.test(label)) && adjustmentRows.length >= 2)
     const nonGaapContext = /non-gaap|adjusted ebitda/i.test(combinedContext)
     if (!nonGaapContext || !reconciliationContext) {
       reject('RECONCILIATION_CONTEXT_MISSING', { nonGaapContext, reconciliationContext })
@@ -442,12 +455,12 @@ export function extractStructuredNonGaapTableFacts({
     for (const item of numericCells) {
       const headerLabels = []
       for (let headerRow = 0; headerRow < rowIndex; headerRow += 1) {
-        const headerCell = grid[headerRow]?.[item.cell.columnIndex]
         const rowCells = [...new Map((grid[headerRow] ?? []).filter(Boolean)
           .map((cell) => [`${cell.rowIndex}:${cell.columnIndex}`, cell])).values()]
         const rowText = rowCells.map((cell) => cell.text).join(' ')
         const explicitPeriodRow = /\b(?:three|six|nine|twelve) months ended|\byear ended|\bCY\s*20\d{2}|\bFY\s*20\d{2}|\bQ[1-4]\b|\b[1-4]Q\b/i.test(rowText)
         const periodCellCount = rowCells.filter((cell) => /\b20\d{2}(?:A)?\b|\bQ[1-4]\b|\b[1-4]Q\b/i.test(cell.text)).length
+        const headerCell = explicitHeaderCell(grid, headerRow, item.cell.columnIndex, periodCellCount)
         if (headerCell?.text && (headerCell.tagName === 'th' || explicitPeriodRow || periodCellCount >= 2)) {
           headerLabels.push(headerCell.text)
         }
@@ -460,7 +473,7 @@ export function extractStructuredNonGaapTableFacts({
         })
         if (explicitVarianceColumn) continue
         reject('PERIOD_MAPPING_MISSING', { columnIndex: item.cell.columnIndex, headerLabels, rawCellValue: item.rawCellValue })
-        return
+        continue
       }
       mapped.push({ ...item, period })
     }
@@ -598,7 +611,10 @@ const STRUCTURED_FINANCIAL_METRICS = new Set([
 ])
 
 function structuredFinancialCandidates(label) {
-  return metricCandidatesForConcept('company-table', '', label)
+  const normalizedLabel = normalizedCellText(label)
+    .replace(/(?:\s*(?:\(\d+\)|[*†‡]))+\s*$/g, '')
+    .trim()
+  return metricCandidatesForConcept('company-table', '', normalizedLabel)
     .filter((metric) => STRUCTURED_FINANCIAL_METRICS.has(metric))
 }
 
@@ -618,7 +634,8 @@ export function extractStructuredFinancialTableFacts({
     const grid = tableGrid($, table)
     const context = nearbyTableContext($, table)
     const tableText = normalizedCellText($(table).text())
-    const statementScopeEvidence = statementWideOperationScope($, table)
+    const statementScopeEvidence = statementWideOperationScope($, table) ??
+      (/\bsummary of cash flows from continuing operations\b/i.test(context) ? 'continuing operations' : null)
     if (/\b(?:segment\s+results|reportable\s+segments|by\s+segment|segment\s+(?:adjusted\s+)?ebitda|other\s+segment|geographic\s+information)/i
       .test(`${context} ${tableText}`)) return
 
@@ -631,6 +648,7 @@ export function extractStructuredFinancialTableFacts({
     })
     const metricRows = rows.filter((row) => row.labelCell)
     if (!metricRows.length) return
+    const tableMetrics = new Set(metricRows.flatMap((row) => structuredFinancialCandidates(row.labelCell.text)))
 
     const unitContext = `${context} ${grid.slice(0, 8).flat().map((cell) => cell?.text).join(' ')}`
     const unitMetadata = inferredUnits(unitContext) ??
@@ -639,6 +657,11 @@ export function extractStructuredFinancialTableFacts({
 
     for (const { rowIndex, originCells, labelCell } of metricRows) {
       const metricCandidates = structuredFinancialCandidates(labelCell.text)
+      const isolatedCostAllocation = metricCandidates.includes('costOfRevenue') &&
+        !tableMetrics.has('revenue') && !tableMetrics.has('grossProfit') &&
+        /\b(?:share\W*based compensation|expense allocation|allocation of (?:an? )?expense|expenses? by (?:function|category)|depreciation and amortization expenses?)\b/i
+          .test(tableText)
+      if (isolatedCostAllocation) continue
       const numericCells = originCells
         .filter((candidate) => candidate.columnIndex > labelCell.columnIndex)
         .map((cell) => ({ cell, ...tableRowNumber(cell, originCells) }))
@@ -647,12 +670,12 @@ export function extractStructuredFinancialTableFacts({
       for (const item of numericCells) {
         const headerLabels = []
         for (let headerRow = 0; headerRow < rowIndex; headerRow += 1) {
-          const headerCell = grid[headerRow]?.[item.cell.columnIndex]
           const rowCells = [...new Map((grid[headerRow] ?? []).filter(Boolean)
             .map((cell) => [`${cell.rowIndex}:${cell.columnIndex}`, cell])).values()]
           const rowText = rowCells.map((cell) => cell.text).join(' ')
           const explicitPeriodRow = /\b(?:three|six|nine|twelve) months ended|\byear ended|\bCY\s*20\d{2}|\bFY\s*20\d{2}|\bQ[1-4]\b|\b[1-4]Q\b/i.test(rowText)
           const periodCellCount = rowCells.filter((cell) => /\b20\d{2}(?:A)?\b|\bQ[1-4]\b|\b[1-4]Q\b/i.test(cell.text)).length
+          const headerCell = explicitHeaderCell(grid, headerRow, item.cell.columnIndex, periodCellCount)
           if (headerCell?.text && (headerCell.tagName === 'th' || explicitPeriodRow || periodCellCount >= 2)) {
             headerLabels.push(headerCell.text)
           }
@@ -887,8 +910,13 @@ export function selectSupplementalFilings({ filingIndex, years, maxFilings = 20 
   const latestCurrentReports = allCurrentReports.slice(0, 6)
   const companionBuckets = annual.map((annualFiling) => allCurrentReports
     .filter((filing) => filing.filingDate > annualFiling.reportDate && filing.filingDate <= annualFiling.filingDate)
-    .sort((left, right) => String(left.filingDate).localeCompare(String(right.filingDate)) ||
-      String(right.accessionNumber).localeCompare(String(left.accessionNumber)))
+    .sort((left, right) => {
+      const annualTime = new Date(`${annualFiling.filingDate}T12:00:00Z`).getTime()
+      const leftDistance = Math.abs(annualTime - new Date(`${left.filingDate}T12:00:00Z`).getTime())
+      const rightDistance = Math.abs(annualTime - new Date(`${right.filingDate}T12:00:00Z`).getTime())
+      return leftDistance - rightDistance || String(right.filingDate).localeCompare(String(left.filingDate)) ||
+        String(right.accessionNumber).localeCompare(String(left.accessionNumber))
+    })
     .slice(0, 4))
   const annualEarningsBuckets = years.map((year) => allCurrentReports.filter((filing) => {
     const filingDate = String(filing.filingDate ?? '')

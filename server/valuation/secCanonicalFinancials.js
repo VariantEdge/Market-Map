@@ -90,7 +90,7 @@ export const SEC_GAAP_METRIC_DEFINITIONS = Object.freeze({
   ebit: Object.freeze({
     providerMetric: null,
     concepts: Object.freeze(['OperatingIncomeLoss', 'ProfitLossFromOperatingActivities']),
-    extensionLabel: /^(?:total )?operating (?:income|profit|loss)(?: \(loss\))?$/i,
+    extensionLabel: /^(?:(?:total )?operating (?:income|profit|loss)(?: \(loss\))?|(?:income|profit|loss) from operations)$/i,
     exclude: /segment|adjusted|margin|percentage|non-gaap/i,
     definitionFingerprint: 'CANONICAL_CONSOLIDATED_GAAP_OPERATING_INCOME',
   }),
@@ -102,7 +102,7 @@ export const SEC_GAAP_METRIC_DEFINITIONS = Object.freeze({
       'CostOfGoodsSold',
       'CostOfSales',
     ]),
-    extensionLabel: /^(?:total )?cost of (?:revenue|revenues|sales|goods and services sold)$/i,
+    extensionLabel: /^(?:total )?cost of (?:revenue|revenues|sales|goods and services sold)(?:\s*(?:\(\d+\)|[*†‡]))?$/i,
     exclude: /segment|product|service|percentage/i,
     definitionFingerprint: 'SEC_CONSOLIDATED_GAAP_COST_OF_REVENUE',
   }),
@@ -113,7 +113,7 @@ export const SEC_GAAP_METRIC_DEFINITIONS = Object.freeze({
       'NetCashProvidedByUsedInOperatingActivities',
       'CashFlowsFromUsedInOperatingActivities',
     ]),
-    extensionLabel: /^net cash (?:provided by|used in|provided by \(used in\)) operating activities(?:,? continuing operations)?$/i,
+    extensionLabel: /^net cash (?:provided by|used in|provided by\s*\/\s*\(used in\)|provided by \(used in\)) operating activities(?:(?:,? | from )continuing operations)?$/i,
     exclude: /discontinued/i,
     definitionFingerprint: 'SEC_CONSOLIDATED_GAAP_OPERATING_CASH_FLOW',
   }),
@@ -426,6 +426,8 @@ function dateAuthorityRank(candidate) {
 
 function additiveCapexClass(candidate) {
   const text = `${candidate.concept ?? ''} ${candidate.label ?? ''}`.toLowerCase().replace(/[^a-z0-9]+/g, ' ')
+  if (/\bproperty\s+plant\s+(?:and\s+)?equipment\b|\bproperty\s+and\s+equipment\b/.test(text) &&
+      /\bnet\s+of\s+computer\s+hardware\b/.test(text)) return 'PROPERTY_PLANT_EQUIPMENT'
   if (/\bcomputer\s+hardware\b/.test(text)) return 'COMPUTER_HARDWARE'
   if (/\bproperty\s+plant\s+(?:and\s+)?equipment\b|\bproperty\s+and\s+equipment\b/.test(text)) {
     return 'PROPERTY_PLANT_EQUIPMENT'
@@ -469,9 +471,15 @@ function additiveCapexCandidate(candidates) {
   if (eligible.length < 2 || accessions.size !== 1) return null
   if (eligible.some((candidate) => /\btotal\b|^capital expenditures?$/i.test(String(candidate.label ?? '').trim()))) return null
   const classified = eligible.map((candidate) => ({ candidate, componentClass: additiveCapexClass(candidate) }))
-  if (classified.some((item) => !item.componentClass) ||
-      new Set(classified.map((item) => item.componentClass)).size !== classified.length) return null
-  const components = classified.map((item) => item.candidate)
+  if (classified.some((item) => !item.componentClass)) return null
+  const byComponentClass = new Map()
+  for (const item of classified) {
+    if (!byComponentClass.has(item.componentClass)) byComponentClass.set(item.componentClass, [])
+    byComponentClass.get(item.componentClass).push(item.candidate)
+  }
+  if (byComponentClass.size < 2 || [...byComponentClass.values()].some((group) =>
+    group.some((candidate) => !valuesAgree(candidate.normalizedValue, group[0].normalizedValue)))) return null
+  const components = [...byComponentClass.values()].map((group) => group[0])
   const first = components[0]
   return {
     ...first,
@@ -488,7 +496,7 @@ function additiveCapexCandidate(candidates) {
     derivation: {
       method: 'ADDITIVE_NON_OVERLAPPING_CASH_CAPEX_COMPONENTS',
       exactness: 'EXACT_ARITHMETIC',
-      componentClasses: classified.map((item) => item.componentClass),
+      componentClasses: [...byComponentClass.keys()],
       inputs: components.map(capexDerivationInput),
     },
   }
@@ -853,6 +861,7 @@ export function resolveLatestReportedFinancialPeriod(metric, observations = [], 
     }))
   const observationsWithExplicitPeriods = observations.filter((observation) => observation.metric === metric &&
     observation.periodIdentity.periodEnd && availableByAsOf(observation.filingDate, observation.periodIdentity.periodEnd, asOf) &&
+    (!observation.filingDate || observation.periodIdentity.periodEnd <= String(observation.filingDate).slice(0, 10)) &&
     (DIRECT_REPORT_FORMS.has(observation.form) || EXHIBIT_PERIOD_FORMS.has(observation.form)))
   const eligible = [...observationsWithExplicitPeriods, ...filingPeriods]
     .sort((left, right) => right.periodIdentity.periodEnd.localeCompare(left.periodIdentity.periodEnd) ||

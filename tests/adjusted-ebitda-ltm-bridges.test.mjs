@@ -140,6 +140,28 @@ test('bridge fails closed for mismatched definitions', () => {
   assert.equal(build(records).validationStatus, 'DEFINITION_INCOMPATIBLE')
 })
 
+test('bridge accepts a stable reconciliation taxonomy when period-specific adjustment rows evolve', () => {
+  const records = calendarBridge().map((item, index) => ({
+    ...item,
+    definitionFingerprint: `period-specific-${index}`,
+    tableContext: {
+      ...item.tableContext,
+      rowLabels: [
+        'Adjusted EBITDA',
+        'Restructuring and other charges',
+        'Purchases and sales of business interests',
+        'Separation costs',
+        'Non-operating benefit income',
+        'Depreciation and amortization',
+        'Interest and other financial charges',
+        'Provision for income taxes',
+        ...(index === 1 ? ['Arbitration refund'] : []),
+      ],
+    },
+  }))
+  assert.equal(build(records).value, 120_000_000)
+})
+
 test('bridge fails closed for mismatched currencies', () => {
   const records = calendarBridge()
   records[1] = { ...records[1], currency: 'EUR' }
