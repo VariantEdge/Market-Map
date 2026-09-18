@@ -64,12 +64,26 @@ function auditedStatus(status, period = '2025A') {
 }
 
 test('successful extraction with zero company-defined evidence is NOT_REPORTED through audit', () => {
+  const negativeSearchEvidence = {
+    searchType: 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA', completed: true, failed: false, timedOut: false,
+    coveredPeriods: ['2025A', 'LTM'], eligibleReconciliationsFound: 0,
+    filingsExamined: [{ accessionNumber: '0001-25-000001', form: '10-K', extractionCompleted: true }],
+  }
   const result = buildCanonicalAdjustedEbitda({
     company: { ticker: 'SYNTH', name: 'Synthetic', cik: '1' }, rawLedger: [], years: [2025],
+    negativeSearchEvidence,
   })
   assert.equal(result.calendarActuals[2025].validationStatus, 'NOT_REPORTED')
   assert.equal(result.ltm.validationStatus, 'NOT_REPORTED')
-  assert.equal(auditedStatus(result.calendarActuals[2025].validationStatus).status, 'NOT_REPORTED')
+  assert.deepEqual(result.calendarActuals[2025].negativeSearchEvidence, negativeSearchEvidence)
+})
+
+test('zero eligible facts without a completed filing search remains unresolved', () => {
+  const result = buildCanonicalAdjustedEbitda({
+    company: { ticker: 'SYNTH', name: 'Synthetic', cik: '1' }, rawLedger: [], years: [2025],
+  })
+  assert.equal(result.calendarActuals[2025].validationStatus, 'MISSING_SOURCE_DATA')
+  assert.equal(result.ltm.validationStatus, 'MISSING_SOURCE_DATA')
 })
 
 test('extraction failure remains MISSING_SOURCE_DATA through audit', async () => {

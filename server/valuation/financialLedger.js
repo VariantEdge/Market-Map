@@ -573,6 +573,7 @@ export async function buildCanonicalQuarterlyLedger({
   years,
   filingIndex = null,
   supplementalRawFacts = [],
+  negativeSearchEvidence = null,
   fallbackStatus = HISTORICAL_STATUS.UNAVAILABLE,
   includeAdjustedEbitda = true,
 }) {
@@ -597,7 +598,7 @@ export async function buildCanonicalQuarterlyLedger({
     (left, right) => left - Math.abs(right), 'CFO_MINUS_CAPEX', snapshot)
 
   const adjustedEbitda = includeAdjustedEbitda
-    ? buildCanonicalAdjustedEbitda({ company, rawLedger, years })
+    ? buildCanonicalAdjustedEbitda({ company, rawLedger, years, negativeSearchEvidence })
     : {
         quarters: [],
         calendarActuals: Object.fromEntries(years.map((year) => [year, {

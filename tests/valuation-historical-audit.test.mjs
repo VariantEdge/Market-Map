@@ -44,6 +44,52 @@ function evidenceComponent(sourceId, overrides = {}) {
   }
 }
 
+function completedNegativeSearchEvidence(period = '2025A') {
+  return {
+    searchType: 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA',
+    completed: true,
+    failed: false,
+    timedOut: false,
+    coveredPeriods: [period],
+    eligibleReconciliationsFound: 0,
+    filingsExamined: [{
+      accessionNumber: '0001-25-000001', form: '10-K', extractionCompleted: true,
+    }],
+  }
+}
+
+test('historical audit rejects NOT_REPORTED without completed filing-search evidence', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  Object.assign(records[0], {
+    displayedValue: null, validationStatus: 'NOT_REPORTED', quarterlyComponents: [],
+    failureReason: 'NOT_REPORTED',
+  })
+  assert.ok(validateHistoricalAuditRecords(records, { tickers, metrics, periods }).some((issue) =>
+    issue.reason === 'NULL_WITHOUT_POSITIVE_EVIDENCE' && issue.status === 'NOT_REPORTED'))
+})
+
+test('historical audit accepts NOT_REPORTED after a completed covered filing search finds no eligible reconciliation', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  Object.assign(records[0], {
+    displayedValue: null, validationStatus: 'NOT_REPORTED', quarterlyComponents: [],
+    failureReason: 'NOT_REPORTED', negativeSearchEvidence: completedNegativeSearchEvidence('2023A'),
+  })
+  assert.deepEqual(validateHistoricalAuditRecords(records, { tickers, metrics, periods }), [])
+})
+
+test('historical audit rejects NOT_REPORTED when extraction timed out', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  const evidence = completedNegativeSearchEvidence('2023A')
+  evidence.completed = false
+  evidence.timedOut = true
+  Object.assign(records[0], {
+    displayedValue: null, validationStatus: 'NOT_REPORTED', quarterlyComponents: [],
+    failureReason: 'NOT_REPORTED', negativeSearchEvidence: evidence,
+  })
+  assert.ok(validateHistoricalAuditRecords(records, { tickers, metrics, periods }).some((issue) =>
+    issue.reason === 'NULL_WITHOUT_POSITIVE_EVIDENCE' && issue.status === 'NOT_REPORTED'))
+})
+
 test('historical audit rejects DEFINITION_INCOMPATIBLE without source evidence', () => {
   const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
   Object.assign(records[0], {

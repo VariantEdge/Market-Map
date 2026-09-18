@@ -69,8 +69,8 @@ function bridgeLedger() {
   ]
 }
 
-function snapshotFor(rawLedger) {
-  const canonical = buildCanonicalAdjustedEbitda({ company, rawLedger, years: ACTUAL_YEARS })
+function snapshotFor(rawLedger, negativeSearchEvidence = null) {
+  const canonical = buildCanonicalAdjustedEbitda({ company, rawLedger, years: ACTUAL_YEARS, negativeSearchEvidence })
   const periods = ['2023A', '2024A', '2025A', 'LTM', 'NTM', '2026E', '2027E']
   const revenue = Object.fromEntries(periods.map((period) => [period, period === 'LTM' ? 400_000_000 : 100_000_000]))
   const baseProvenance = Object.fromEntries(periods.map((period) => [period, {
@@ -324,7 +324,12 @@ test('controlled refresh replaces a legacy LTM N/A once, stamps the domain versi
 })
 
 test('current-engine legitimate LTM N/A is healthy and does not queue a rebuild', () => {
-  const snapshot = snapshotFor([])
+  const negativeSearchEvidence = {
+    searchType: 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA', completed: true, failed: false, timedOut: false,
+    coveredPeriods: ['2023A', '2024A', '2025A', 'LTM'], eligibleReconciliationsFound: 0,
+    filingsExamined: [{ accessionNumber: '0001-26-000001', form: '10-K', extractionCompleted: true }],
+  }
+  const snapshot = snapshotFor([], negativeSearchEvidence)
   assert.equal(snapshot.metrics.ebitda.LTM, null)
   assert.equal(snapshot.provenance.ebitda.LTM.adjustedEbitdaEngineVersion,
     ADJUSTED_EBITDA_ENGINE_VERSION)

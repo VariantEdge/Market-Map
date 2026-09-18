@@ -956,6 +956,7 @@ export async function loadSupplementalFilingFacts({ company, filingIndex, years,
   const candidates = selectSupplementalFilings({ filingIndex, years, maxFilings })
   const records = []
   const errors = []
+  const completedFilings = []
   for (const filing of candidates) {
     signal?.throwIfAborted()
     try {
@@ -980,10 +981,46 @@ export async function loadSupplementalFilingFacts({ company, filingIndex, years,
         const xml = await fetchSecText(instance.url, { signal })
         records.push(...extractXbrlInstanceFacts({ company: sourceCompany, filing, xml, sourceUrl: instance.url }))
       }
+      completedFilings.push({
+        accessionNumber: filing.accessionNumber,
+        form: filing.form,
+        filingDate: filing.filingDate ?? null,
+        reportDate: filing.reportDate ?? null,
+        filingUrl: filing.filingUrl ?? null,
+        extractionCompleted: true,
+      })
     } catch (error) {
       if (signal?.aborted) throw error
       errors.push({ accessionNumber: filing.accessionNumber, error: error.message })
     }
   }
-  return { records, errors, filingsExamined: candidates.length }
+  const completed = candidates.length > 0 && errors.length === 0 && completedFilings.length === candidates.length
+  const eligibleReconciliationsFound = records.filter((record) =>
+    record.metricCandidates?.includes('adjustedEbitda') &&
+    record.rawSourceType === 'SEC_NON_GAAP_RECONCILIATION_TABLE').length
+  const coveredAnnualYears = new Set(completedFilings
+    .map((filing) => Number(String(filing.reportDate ?? '').slice(0, 4)))
+    .filter(Number.isInteger))
+  const latestRequestedYear = Math.max(...years.map(Number).filter(Number.isFinite))
+  const coveredPeriods = completed
+    ? years.filter((year) => coveredAnnualYears.has(Number(year))).map((year) => `${year}A`)
+    : []
+  if (completed && Number.isFinite(latestRequestedYear) && completedFilings.some((filing) =>
+    String(filing.reportDate ?? '') > `${latestRequestedYear}-12-31`)) coveredPeriods.push('LTM')
+  return {
+    records,
+    errors,
+    filingsExamined: candidates.length,
+    negativeSearchEvidence: {
+      searchType: 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA',
+      completed,
+      failed: errors.length > 0,
+      timedOut: false,
+      requestedYears: [...years],
+      coveredPeriods,
+      eligibleReconciliationsFound,
+      filingsExamined: completedFilings,
+      extractionErrors: errors,
+    },
+  }
 }

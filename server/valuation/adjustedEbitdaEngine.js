@@ -325,6 +325,31 @@ function unavailable(reason, components = [], evidenceExists = components.length
   }
 }
 
+function completedNegativeSearchForPeriod(evidence, period) {
+  return evidence?.searchType === 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA' &&
+    evidence.completed === true && evidence.timedOut !== true && evidence.failed !== true &&
+    Number(evidence.eligibleReconciliationsFound) === 0 &&
+    (evidence.coveredPeriods ?? []).includes(String(period)) &&
+    (evidence.filingsExamined ?? []).length > 0 &&
+    evidence.filingsExamined.every((filing) =>
+      filing.accessionNumber && filing.form && filing.extractionCompleted === true)
+}
+
+function withNegativeSearchEvidence(entry, period, evidence) {
+  if (entry?.value != null || entry?.validationStatus !== 'NOT_REPORTED') return entry
+  if (completedNegativeSearchForPeriod(evidence, period)) {
+    return { ...entry, negativeSearchEvidence: evidence }
+  }
+  return {
+    ...entry,
+    validationStatus: evidence?.completed === true
+      ? 'INSUFFICIENT_PERIOD_COVERAGE'
+      : 'MISSING_SOURCE_DATA',
+    negativeSearchEvidence: evidence ?? null,
+    warnings: [...new Set([...(entry.warnings ?? []), 'INCOMPLETE_NEGATIVE_SOURCE_SEARCH'])],
+  }
+}
+
 function directCalendarYearEntry(fact) {
   const sourceComponent = component(fact)
   return withDenominatorIdentity({
@@ -545,7 +570,7 @@ function ltmEntry(facts) {
     failures[0] ?? unavailable('FOUR_STANDALONE_QUARTERS_UNAVAILABLE', [], facts.length > 0)
 }
 
-export function buildCanonicalAdjustedEbitda({ company, rawLedger, years }) {
+export function buildCanonicalAdjustedEbitda({ company, rawLedger, years, negativeSearchEvidence = null }) {
   const { selected, rejected } = selectAuthoritativeFacts(rawLedger)
   const quarters = selected
     .filter((fact) => fact.periodType === ADJUSTED_EBITDA_PERIOD.QUARTER)
@@ -553,13 +578,14 @@ export function buildCanonicalAdjustedEbitda({ company, rawLedger, years }) {
   const calendarActuals = Object.fromEntries(years.map((year) => {
     const direct = selected.find((fact) => fact.periodType === ADJUSTED_EBITDA_PERIOD.CALENDAR_YEAR &&
       fact.startDate === `${year}-01-01` && fact.endDate === `${year}-12-31`)
-    return [year, direct ? directCalendarYearEntry(direct) : derivedCalendarYearEntry(year, selected)]
+    const entry = direct ? directCalendarYearEntry(direct) : derivedCalendarYearEntry(year, selected)
+    return [year, withNegativeSearchEvidence(entry, `${year}A`, negativeSearchEvidence)]
   }))
   return {
     engineVersion: ADJUSTED_EBITDA_ENGINE_VERSION,
     quarters,
     calendarActuals,
-    ltm: ltmEntry(selected),
+    ltm: withNegativeSearchEvidence(ltmEntry(selected), 'LTM', negativeSearchEvidence),
     selectedFacts: selected,
     rejectedFacts: rejected,
   }

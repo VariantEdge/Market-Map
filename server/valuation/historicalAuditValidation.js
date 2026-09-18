@@ -52,12 +52,26 @@ function hasOperationScopeIncompatibilityEvidence(record) {
   return scopes.length === components.length && new Set(scopes).size > 1
 }
 
+function hasCompletedNegativeSearchEvidence(record) {
+  const evidence = record.negativeSearchEvidence
+  if (!evidence || evidence.searchType !== 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA') return false
+  if (evidence.completed !== true || evidence.timedOut === true || evidence.failed === true) return false
+  if (Number(evidence.eligibleReconciliationsFound) !== 0) return false
+  if (!(evidence.coveredPeriods ?? []).includes(String(record.calendarYear))) return false
+  const filings = evidence.filingsExamined ?? []
+  return filings.length > 0 && filings.every((filing) =>
+    filing.accessionNumber && filing.form && filing.extractionCompleted === true)
+}
+
 function hasRequiredNullEvidence(record) {
   if (record.validationStatus === 'DEFINITION_INCOMPATIBLE') {
     return hasDefinitionIncompatibilityEvidence(record)
   }
   if (record.validationStatus === 'OPERATION_SCOPE_INCOMPATIBLE') {
     return hasOperationScopeIncompatibilityEvidence(record)
+  }
+  if (record.validationStatus === 'NOT_REPORTED') {
+    return hasCompletedNegativeSearchEvidence(record)
   }
   return true
 }

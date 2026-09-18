@@ -976,6 +976,52 @@ test('additive capex retains reconciliation evidence when a reported total agree
   assert.equal(capex.derivation.reconciliation.reportedTotals[0].normalizedValue, 140)
 })
 
+function additiveCapexWithUnclassifiedCandidate(thirdValue) {
+  const accessionNumber = `capex-third-${thirdValue}`
+  const common = {
+    units: 'USD', currency: 'USD', startDate: '2025-01-01', endDate: '2025-12-31',
+    periodType: 'FISCAL_YEAR', fiscalPeriod: 'FY', fiscalYear: 2025,
+    filingForm: '10-K', filingDate: '2026-02-01', accessionNumber,
+    filingUrl: `https://www.sec.gov/${accessionNumber}.htm`, dateAuthority: DATE_AUTHORITY.REPORTED,
+    explicitPeriodMapping: true, metricCandidates: ['capitalExpenditures'], namespace: 'testco',
+  }
+  return adaptSecCanonicalFinancials({
+    company, facts: { cik: company.cik, facts: {} },
+    supplementalFacts: [
+      { ...common, id: 'ppe-net', concept: 'PaymentsToAcquirePropertyPlantAndEquipmentNetOfComputerHardware',
+        label: 'Payments for property, plant and equipment, net of computer hardware', value: -100 },
+      { ...common, id: 'hardware', concept: 'PurchasesOfComputerHardware',
+        label: 'Purchases of computer hardware', value: -40 },
+      { ...common, id: 'standard-ppe', namespace: 'us-gaap', concept: 'PaymentsToAcquirePropertyPlantAndEquipment',
+        label: 'Payments to acquire property, plant and equipment', value: -thirdValue },
+    ],
+    metrics: ['capitalExpenditures'],
+  }).observations[0]
+}
+
+test('unclassified PP&E matching an additive component is retained as corroborating evidence', () => {
+  const capex = additiveCapexWithUnclassifiedCandidate(100)
+  assert.equal(capex.normalizedValue, 140)
+  assert.notEqual(capex.deduplicationStatus, 'REQUIRES_REVIEW')
+  assert.equal(capex.derivation.reconciliation.componentCorroborations[0].sourceId, 'standard-ppe')
+})
+
+test('unclassified PP&E matching the additive sum is retained as total reconciliation evidence', () => {
+  const capex = additiveCapexWithUnclassifiedCandidate(140)
+  assert.equal(capex.normalizedValue, 140)
+  assert.notEqual(capex.deduplicationStatus, 'REQUIRES_REVIEW')
+  assert.equal(capex.derivation.reconciliation.reportedTotals[0].sourceId, 'standard-ppe')
+})
+
+test('unclassified PP&E disagreeing with components and additive sum fails closed', () => {
+  const capex = additiveCapexWithUnclassifiedCandidate(150)
+  assert.equal(capex.normalizedValue, 140)
+  assert.equal(capex.deduplicationStatus, 'REQUIRES_REVIEW')
+  assert.equal(capex.conflicts[0].type, 'SOURCE_VALUE_CONFLICT')
+  assert.deepEqual(capex.conflicts[0].values, [140, 150])
+  assert.equal(capex.derivation.reconciliation.conflictingCandidates[0].sourceId, 'standard-ppe')
+})
+
 test('generic PP&E and hardware labels are not summed without explicit non-overlap evidence', () => {
   const accessionNumber = 'ambiguous-capex-components'
   const common = {

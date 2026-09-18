@@ -449,6 +449,7 @@ export async function loadAdjustedEbitdaProductionTask(input, dependencies = {},
       years: input.years,
       filingIndex: input.filingIndex,
       supplementalRawFacts: supplemental.records,
+      negativeSearchEvidence: supplemental.negativeSearchEvidence ?? null,
       fallbackStatus: input.fallbackStatus,
     })
     return { ledger, supplemental, failure: null }
@@ -494,6 +495,7 @@ export async function loadLegacyForwardBasisProductionTask(input, dependencies =
     const ledger = await buildLedger({
       company: input.company, facts: input.facts, years: input.years, filingIndex: input.filingIndex,
       supplementalRawFacts: supplemental.records, fallbackStatus: input.fallbackStatus,
+      negativeSearchEvidence: supplemental.negativeSearchEvidence ?? null,
       includeAdjustedEbitda: false,
     })
     return completeWithSecExceptionQuarters(

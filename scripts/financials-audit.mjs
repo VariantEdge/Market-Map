@@ -208,6 +208,7 @@ function auditRecord({ company, ticker, cik, metric, period, entry, snapshot, cl
     definitionFingerprint: entry?.definitionFingerprint ?? component?.definitionFingerprint ?? null,
     compatibleDefinitionFingerprints: entry?.compatibleDefinitionFingerprints ?? null,
     economicSanityFlags: entry?.economicSanityFlags ?? [],
+    negativeSearchEvidence: entry?.negativeSearchEvidence ?? null,
   }
 }
 
@@ -246,7 +247,10 @@ for (const [tickerIndex, ticker] of requestedTickers.entries()) {
     const classification = classifyIssuer({ ticker, company, filings: filingIndex.filings })
     const facts = await getCompanyFacts(company.cik).catch(() => null)
     const supplemental = await loadSupplementalFilingFacts({ company, filingIndex, years })
-    const ledger = await buildCanonicalQuarterlyLedger({ company, facts, years, filingIndex, supplementalRawFacts: supplemental.records })
+    const ledger = await buildCanonicalQuarterlyLedger({
+      company, facts, years, filingIndex, supplementalRawFacts: supplemental.records,
+      negativeSearchEvidence: supplemental.negativeSearchEvidence ?? null,
+    })
     const production = await buildCanonicalHistoricalFinancials({
       ticker,
       wiseSheetsRows: wiseSheetsRows.filter((row) => String(row.ticker).toUpperCase() === ticker),

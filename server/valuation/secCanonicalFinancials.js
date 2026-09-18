@@ -490,10 +490,16 @@ function additiveCapexCandidate(candidates) {
   if (new Set(components.map((candidate) => candidate.sourceId)).size !== components.length) return null
   const first = components[0]
   const additiveValue = components.reduce((total, item) => total + Number(item.normalizedValue), 0)
-  const reportedTotals = eligible.filter((candidate) =>
-    !additiveCapexClass(candidate) && broadReportedCapexCandidate(candidate))
-  const conflictingTotals = reportedTotals.filter((candidate) =>
-    !valuesAgree(candidate.normalizedValue, additiveValue))
+  const otherPlausibleCandidates = eligible.filter((candidate) => !additiveCapexClass(candidate))
+  const componentCorroborations = otherPlausibleCandidates.filter((candidate) =>
+    !broadReportedCapexCandidate(candidate) &&
+    components.some((componentCandidate) =>
+      valuesAgree(candidate.normalizedValue, componentCandidate.normalizedValue)))
+  const reportedTotals = otherPlausibleCandidates.filter((candidate) =>
+    broadReportedCapexCandidate(candidate) ||
+    (!componentCorroborations.includes(candidate) && valuesAgree(candidate.normalizedValue, additiveValue)))
+  const conflictingCandidates = otherPlausibleCandidates.filter((candidate) =>
+    !componentCorroborations.includes(candidate) && !valuesAgree(candidate.normalizedValue, additiveValue))
   return {
     ...first,
     rawValue: null,
@@ -502,9 +508,9 @@ function additiveCapexCandidate(candidates) {
     concept: 'AdditiveNonOverlappingCashCapexComponents',
     label: 'Additive non-overlapping cash capex components',
     sourceId: components.map((item) => item.sourceId).sort().join('|PLUS|'),
-    alternatives: reportedTotals,
-    conflicts: conflictingTotals,
-    conflictReason: conflictingTotals.length ? 'SOURCE_VALUE_CONFLICT' : null,
+    alternatives: otherPlausibleCandidates,
+    conflicts: conflictingCandidates,
+    conflictReason: conflictingCandidates.length ? 'SOURCE_VALUE_CONFLICT' : null,
     restatedOrRecast: components.some((item) => item.restatedOrRecast),
     reportedVsDerived: OBSERVATION_BASIS.DERIVED,
     derivation: {
@@ -512,11 +518,13 @@ function additiveCapexCandidate(candidates) {
       exactness: 'EXACT_ARITHMETIC',
       componentClasses: [...byComponentClass.keys()],
       inputs: components.map(capexDerivationInput),
-      reconciliation: reportedTotals.length ? {
-        method: 'ADDITIVE_SUM_VS_REPORTED_TOTAL_CAPEX',
+      reconciliation: otherPlausibleCandidates.length ? {
+        method: 'ADDITIVE_SUM_VS_ALL_PLAUSIBLE_CAPEX_CANDIDATES',
         additiveValue,
+        componentCorroborations: componentCorroborations.map(capexDerivationInput),
         reportedTotals: reportedTotals.map(capexDerivationInput),
-        passed: conflictingTotals.length === 0,
+        conflictingCandidates: conflictingCandidates.map(capexDerivationInput),
+        passed: conflictingCandidates.length === 0,
       } : null,
     },
   }
