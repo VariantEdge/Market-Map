@@ -233,7 +233,10 @@ export function buildCalendarYear(observations = [], year) {
       contributors.flatMap((item) => item.conflicts ?? [])[0]?.type ?? 'DEDUPLICATION_CONFLICT', { coverage })
   }
   if (!compatibleDefinitions(contributors)) {
-    return unavailable(HISTORICAL_RESULT_STATUS.DEFINITION_INCOMPATIBLE, 'DEFINITION_INCOMPATIBLE', { coverage })
+    return unavailable(HISTORICAL_RESULT_STATUS.DEFINITION_INCOMPATIBLE, 'DEFINITION_INCOMPATIBLE', {
+      coverage,
+      components: coverage.intervals.map((interval) => sourceComponent(interval, false)),
+    })
   }
   const economicKeys = coverage.intervals.map((item) => item.observation.economicPeriodKey)
   if (new Set(economicKeys).size !== economicKeys.length) {
@@ -432,7 +435,11 @@ function ltmBridgeResult(observations, { asOfDate, latestReportedPeriod }) {
         const operationScopes = new Set(inputs.map((item) => item.operationScope))
         if (operationScopes.size !== 1) {
           failures.push(unavailable(HISTORICAL_RESULT_STATUS.OPERATION_SCOPE_INCOMPATIBLE,
-            'OPERATION_SCOPE_INCOMPATIBLE'))
+            'OPERATION_SCOPE_INCOMPATIBLE', {
+              components: inputs.map((item) => sourceComponent({
+                observation: item, overlapStart: null, overlapEnd: null,
+              }, false)),
+            }))
           continue
         }
         if (!sameSeries(inputs)) {
@@ -440,7 +447,11 @@ function ltmBridgeResult(observations, { asOfDate, latestReportedPeriod }) {
           continue
         }
         if (!compatibleDefinitions(inputs)) {
-          failures.push(unavailable(HISTORICAL_RESULT_STATUS.DEFINITION_INCOMPATIBLE, 'DEFINITION_INCOMPATIBLE'))
+          failures.push(unavailable(HISTORICAL_RESULT_STATUS.DEFINITION_INCOMPATIBLE, 'DEFINITION_INCOMPATIBLE', {
+            components: inputs.map((item) => sourceComponent({
+              observation: item, overlapStart: null, overlapEnd: null,
+            }, false)),
+          }))
           continue
         }
         if (latestReportedPeriod?.valid && current.periodIdentity.periodEnd < latestReportedPeriod.periodEnd) {
@@ -541,7 +552,13 @@ function buildFourQuarterLtm(observations, { asOfDate, latestReportedPeriod }) {
     return unavailable(HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW,
       selectedGroups.flat().flatMap((item) => item.conflicts ?? [])[0]?.type ?? 'DEDUPLICATION_CONFLICT')
   }
-  if (!compatibleDefinitions(selected)) return unavailable(HISTORICAL_RESULT_STATUS.DEFINITION_INCOMPATIBLE, 'DEFINITION_INCOMPATIBLE')
+  if (!compatibleDefinitions(selected)) {
+    return unavailable(HISTORICAL_RESULT_STATUS.DEFINITION_INCOMPATIBLE, 'DEFINITION_INCOMPATIBLE', {
+      components: selected.map((item) => sourceComponent({
+        observation: item, overlapStart: null, overlapEnd: null,
+      }, false)),
+    })
+  }
   if (!selected.slice(1).every((item, index) => consecutive(selected[index], item))) {
     return unavailable(HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE, 'LTM_PERIOD_GAP',
       { missingPeriods: missingLtmPeriods(selected, latestReportedPeriod) })

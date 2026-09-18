@@ -918,6 +918,64 @@ test('distinct same-filing cash capex components are summed only when labels pro
   assert.equal(fcf.derivation.inputs[1].normalizedValue, 4_333_087_000)
 })
 
+test('additive capex fails closed when a reported total materially disagrees', () => {
+  const accessionNumber = 'capex-total-conflict'
+  const common = {
+    units: 'USD', currency: 'USD', startDate: '2025-01-01', endDate: '2025-12-31',
+    periodType: 'FISCAL_YEAR', fiscalPeriod: 'FY', fiscalYear: 2025,
+    filingForm: '10-K', filingDate: '2026-02-01', accessionNumber,
+    filingUrl: 'https://www.sec.gov/capex-total-conflict.htm', dateAuthority: DATE_AUTHORITY.REPORTED,
+    explicitPeriodMapping: true, metricCandidates: ['capitalExpenditures'], namespace: 'testco',
+  }
+  const result = adaptSecCanonicalFinancials({
+    company, facts: { cik: company.cik, facts: {} },
+    supplementalFacts: [
+      { ...common, id: 'ppe', concept: 'PaymentsToAcquirePropertyPlantAndEquipment',
+        label: 'Payments for property, plant and equipment, net of computer hardware', value: -100 },
+      { ...common, id: 'hardware', concept: 'PurchasesOfComputerHardware',
+        label: 'Purchases of computer hardware', value: -40 },
+      { ...common, id: 'reported-total', concept: 'TotalCapitalExpenditures',
+        label: 'Capital expenditures for property, plant, equipment and computer hardware', value: -150 },
+    ],
+    metrics: ['capitalExpenditures'],
+  })
+  const capex = result.observations[0]
+  assert.equal(capex.normalizedValue, 140)
+  assert.equal(capex.deduplicationStatus, 'REQUIRES_REVIEW')
+  assert.equal(capex.conflicts[0].type, 'SOURCE_VALUE_CONFLICT')
+  assert.deepEqual(capex.conflicts[0].values, [140, 150])
+  assert.equal(capex.derivation.reconciliation.passed, false)
+  assert.equal(capex.derivation.reconciliation.reportedTotals[0].sourceId, 'reported-total')
+})
+
+test('additive capex retains reconciliation evidence when a reported total agrees', () => {
+  const accessionNumber = 'capex-total-reconciled'
+  const common = {
+    units: 'USD', currency: 'USD', startDate: '2025-01-01', endDate: '2025-12-31',
+    periodType: 'FISCAL_YEAR', fiscalPeriod: 'FY', fiscalYear: 2025,
+    filingForm: '10-K', filingDate: '2026-02-01', accessionNumber,
+    filingUrl: 'https://www.sec.gov/capex-total-reconciled.htm', dateAuthority: DATE_AUTHORITY.REPORTED,
+    explicitPeriodMapping: true, metricCandidates: ['capitalExpenditures'], namespace: 'testco',
+  }
+  const result = adaptSecCanonicalFinancials({
+    company, facts: { cik: company.cik, facts: {} },
+    supplementalFacts: [
+      { ...common, id: 'ppe', concept: 'PaymentsToAcquirePropertyPlantAndEquipment',
+        label: 'Payments for property, plant and equipment, net of computer hardware', value: -100 },
+      { ...common, id: 'hardware', concept: 'PurchasesOfComputerHardware',
+        label: 'Purchases of computer hardware', value: -40 },
+      { ...common, id: 'reported-total', concept: 'TotalCapitalExpenditures',
+        label: 'Capital expenditures for property, plant, equipment and computer hardware', value: -140 },
+    ],
+    metrics: ['capitalExpenditures'],
+  })
+  const capex = result.observations[0]
+  assert.equal(capex.normalizedValue, 140)
+  assert.notEqual(capex.deduplicationStatus, 'REQUIRES_REVIEW')
+  assert.equal(capex.derivation.reconciliation.passed, true)
+  assert.equal(capex.derivation.reconciliation.reportedTotals[0].normalizedValue, 140)
+})
+
 test('generic PP&E and hardware labels are not summed without explicit non-overlap evidence', () => {
   const accessionNumber = 'ambiguous-capex-components'
   const common = {

@@ -34,6 +34,34 @@ function hasComponentProvenance(component) {
     hasComponentPeriodIdentity(component))
 }
 
+function definitionFingerprint(component) {
+  return component?.definitionFingerprint ?? component?.sourceDefinitionFingerprint ?? null
+}
+
+function hasDefinitionIncompatibilityEvidence(record) {
+  const components = record.quarterlyComponents ?? []
+  if (components.length < 2 || components.some((component) => !hasComponentProvenance(component))) return false
+  const fingerprints = components.map(definitionFingerprint).filter(Boolean)
+  return fingerprints.length === components.length && new Set(fingerprints).size > 1
+}
+
+function hasOperationScopeIncompatibilityEvidence(record) {
+  const components = record.quarterlyComponents ?? []
+  if (components.length < 2 || components.some((component) => !hasComponentProvenance(component))) return false
+  const scopes = components.map((component) => component.operationScope).filter(Boolean)
+  return scopes.length === components.length && new Set(scopes).size > 1
+}
+
+function hasRequiredNullEvidence(record) {
+  if (record.validationStatus === 'DEFINITION_INCOMPATIBLE') {
+    return hasDefinitionIncompatibilityEvidence(record)
+  }
+  if (record.validationStatus === 'OPERATION_SCOPE_INCOMPATIBLE') {
+    return hasOperationScopeIncompatibilityEvidence(record)
+  }
+  return true
+}
+
 export function validateHistoricalAuditRecords(records = [], { tickers = [], metrics = [], periods = [] } = {}) {
   const issues = []
   const grouped = new Map()
@@ -59,6 +87,8 @@ export function validateHistoricalAuditRecords(records = [], { tickers = [], met
         issues.push({ ticker, metric, period, reason: 'MANDATORY_CELL_UNRESOLVED', status: record.validationStatus })
       } else if (!EXPLICIT_NULL_STATUSES.has(record.validationStatus)) {
         issues.push({ ticker, metric, period, reason: 'UNJUSTIFIED_NULL', status: record.validationStatus })
+      } else if (!hasRequiredNullEvidence(record)) {
+        issues.push({ ticker, metric, period, reason: 'NULL_WITHOUT_POSITIVE_EVIDENCE', status: record.validationStatus })
       }
       if (!record.failureReason && !record.warning) {
         issues.push({ ticker, metric, period, reason: 'NULL_WITHOUT_EXPLICIT_REASON', status: record.validationStatus })

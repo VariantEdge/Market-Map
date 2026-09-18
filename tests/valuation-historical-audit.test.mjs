@@ -27,13 +27,73 @@ test('historical audit requires exactly seven metrics across all requested actua
 test('historical audit accepts explicit fail-closed N/A and rejects stale generic nulls', () => {
   const base = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
   const explicit = base.map((item) => item.metric === 'adjustedEbitda' && item.calendarYear === 'LTM'
-    ? record(item.metric, item.calendarYear, { displayedValue: null, validationStatus: 'DEFINITION_INCOMPATIBLE',
-      quarterlyComponents: [], failureReason: 'DEFINITION_INCOMPATIBLE' }) : item)
+    ? record(item.metric, item.calendarYear, { displayedValue: null, validationStatus: 'LEGITIMATE_NA',
+      quarterlyComponents: [], failureReason: 'LEGITIMATE_NA' }) : item)
   assert.deepEqual(validateHistoricalAuditRecords(explicit, { tickers, metrics, periods }), [])
   const unjustified = explicit.map((item) => item.metric === 'revenue' && item.calendarYear === '2025A'
     ? record(item.metric, item.calendarYear, { displayedValue: null, validationStatus: 'UNVERIFIED', quarterlyComponents: [] }) : item)
   assert.ok(validateHistoricalAuditRecords(unjustified, { tickers, metrics, periods })
     .some((issue) => issue.metric === 'revenue' && issue.reason === 'UNJUSTIFIED_NULL'))
+})
+
+function evidenceComponent(sourceId, overrides = {}) {
+  return {
+    sourceProvider: 'SEC', sourceId,
+    sourceStart: '2025-01-01', sourceEnd: '2025-06-30',
+    ...overrides,
+  }
+}
+
+test('historical audit rejects DEFINITION_INCOMPATIBLE without source evidence', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  Object.assign(records[0], {
+    displayedValue: null,
+    validationStatus: 'DEFINITION_INCOMPATIBLE',
+    quarterlyComponents: [],
+    failureReason: 'DEFINITION_INCOMPATIBLE',
+  })
+  assert.ok(validateHistoricalAuditRecords(records, { tickers, metrics, periods }).some((issue) =>
+    issue.reason === 'NULL_WITHOUT_POSITIVE_EVIDENCE' && issue.status === 'DEFINITION_INCOMPATIBLE'))
+})
+
+test('historical audit accepts incompatible definition evidence with distinct source fingerprints', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  Object.assign(records[0], {
+    displayedValue: null,
+    validationStatus: 'DEFINITION_INCOMPATIBLE',
+    quarterlyComponents: [
+      evidenceComponent('definition-a', { definitionFingerprint: 'definition-a' }),
+      evidenceComponent('definition-b', { definitionFingerprint: 'definition-b' }),
+    ],
+    failureReason: 'DEFINITION_INCOMPATIBLE',
+  })
+  assert.deepEqual(validateHistoricalAuditRecords(records, { tickers, metrics, periods }), [])
+})
+
+test('historical audit rejects OPERATION_SCOPE_INCOMPATIBLE without source evidence', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  Object.assign(records[0], {
+    displayedValue: null,
+    validationStatus: 'OPERATION_SCOPE_INCOMPATIBLE',
+    quarterlyComponents: [],
+    failureReason: 'OPERATION_SCOPE_INCOMPATIBLE',
+  })
+  assert.ok(validateHistoricalAuditRecords(records, { tickers, metrics, periods }).some((issue) =>
+    issue.reason === 'NULL_WITHOUT_POSITIVE_EVIDENCE' && issue.status === 'OPERATION_SCOPE_INCOMPATIBLE'))
+})
+
+test('historical audit accepts incompatible operation-scope evidence from conflicting sources', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  Object.assign(records[0], {
+    displayedValue: null,
+    validationStatus: 'OPERATION_SCOPE_INCOMPATIBLE',
+    quarterlyComponents: [
+      evidenceComponent('scope-a', { operationScope: 'CONTINUING_OPERATIONS' }),
+      evidenceComponent('scope-b', { operationScope: 'TOTAL_INCLUDING_DISCONTINUED' }),
+    ],
+    failureReason: 'OPERATION_SCOPE_INCOMPATIBLE',
+  })
+  assert.deepEqual(validateHistoricalAuditRecords(records, { tickers, metrics, periods }), [])
 })
 
 for (const validationStatus of [

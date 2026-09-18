@@ -425,6 +425,7 @@ function dateAuthorityRank(candidate) {
 }
 
 function additiveCapexClass(candidate) {
+  if (broadReportedCapexCandidate(candidate)) return null
   const text = `${candidate.concept ?? ''} ${candidate.label ?? ''}`.toLowerCase().replace(/[^a-z0-9]+/g, ' ')
   if (/\bproperty\s+plant\s+(?:and\s+)?equipment\b|\bproperty\s+and\s+equipment\b/.test(text) &&
       /\b(?:net\s+of|excluding|exclusive\s+of)\s+(?:purchases?\s+of\s+)?computer\s+hardware\b/.test(text)) {
@@ -432,6 +433,12 @@ function additiveCapexClass(candidate) {
   }
   if (/\bcomputer\s+hardware\b/.test(text)) return 'COMPUTER_HARDWARE'
   return null
+}
+
+function broadReportedCapexCandidate(candidate) {
+  const text = `${candidate.concept ?? ''} ${candidate.label ?? ''}`.toLowerCase().replace(/[^a-z0-9]+/g, ' ')
+  return /\btotal\s+(?:capital expenditures?|capex)\b/.test(text) ||
+    /^\s*(?:capital expenditures?|capex)(?:\s+for\s+.+)?\s*$/.test(String(candidate.label ?? '').toLowerCase())
 }
 
 function capexDerivationInput(candidate) {
@@ -466,12 +473,12 @@ function additiveCapexCandidate(candidates) {
   if (candidates.length < 2) return null
   const authority = dateAuthorityRank(candidates[0])
   const eligible = candidates.filter((candidate) => dateAuthorityRank(candidate) === authority)
-  const accessions = new Set(eligible.map((candidate) => candidate.accession).filter(Boolean))
-  if (eligible.length < 2 || accessions.size !== 1) return null
   const classified = eligible.map((candidate) => ({ candidate, componentClass: additiveCapexClass(candidate) }))
     .filter((item) => item.componentClass)
   if (classified.length < 2 || classified.some(({ candidate }) =>
     candidate.explicitPeriodMapping !== true || !candidate.sourceId || !candidate.accession)) return null
+  const componentAccessions = new Set(classified.map(({ candidate }) => candidate.accession))
+  if (componentAccessions.size !== 1) return null
   const byComponentClass = new Map()
   for (const item of classified) {
     if (!byComponentClass.has(item.componentClass)) byComponentClass.set(item.componentClass, [])
@@ -482,16 +489,22 @@ function additiveCapexCandidate(candidates) {
   const components = [...byComponentClass.values()].map((group) => group[0])
   if (new Set(components.map((candidate) => candidate.sourceId)).size !== components.length) return null
   const first = components[0]
+  const additiveValue = components.reduce((total, item) => total + Number(item.normalizedValue), 0)
+  const reportedTotals = eligible.filter((candidate) =>
+    !additiveCapexClass(candidate) && broadReportedCapexCandidate(candidate))
+  const conflictingTotals = reportedTotals.filter((candidate) =>
+    !valuesAgree(candidate.normalizedValue, additiveValue))
   return {
     ...first,
     rawValue: null,
-    normalizedValue: components.reduce((total, item) => total + Number(item.normalizedValue), 0),
+    normalizedValue: additiveValue,
     namespace: 'derived',
     concept: 'AdditiveNonOverlappingCashCapexComponents',
     label: 'Additive non-overlapping cash capex components',
     sourceId: components.map((item) => item.sourceId).sort().join('|PLUS|'),
-    alternatives: [],
-    conflicts: [],
+    alternatives: reportedTotals,
+    conflicts: conflictingTotals,
+    conflictReason: conflictingTotals.length ? 'SOURCE_VALUE_CONFLICT' : null,
     restatedOrRecast: components.some((item) => item.restatedOrRecast),
     reportedVsDerived: OBSERVATION_BASIS.DERIVED,
     derivation: {
@@ -499,6 +512,12 @@ function additiveCapexCandidate(candidates) {
       exactness: 'EXACT_ARITHMETIC',
       componentClasses: [...byComponentClass.keys()],
       inputs: components.map(capexDerivationInput),
+      reconciliation: reportedTotals.length ? {
+        method: 'ADDITIVE_SUM_VS_REPORTED_TOTAL_CAPEX',
+        additiveValue,
+        reportedTotals: reportedTotals.map(capexDerivationInput),
+        passed: conflictingTotals.length === 0,
+      } : null,
     },
   }
 }
@@ -646,7 +665,7 @@ function canonicalSecObservation(candidate) {
     ...observation,
     deduplicationStatus: 'REQUIRES_REVIEW',
     conflicts: [{
-      type: 'VALUE_CONFLICT',
+      type: candidate.conflictReason ?? 'VALUE_CONFLICT',
       sourceIds: [candidate.sourceId, ...candidate.conflicts.map((item) => item.sourceId)],
       values: [candidate.normalizedValue, ...candidate.conflicts.map((item) => item.normalizedValue)],
     }],
@@ -1135,7 +1154,7 @@ function applyDerivationFailures(calendarActuals, ltm, failures, years) {
           calendarActuals.freeCashFlow[year] = resultFailure(
             HISTORICAL_RESULT_STATUS.OPERATION_SCOPE_INCOMPATIBLE,
             failure.reason,
-            { operationScopes: failure.operationScopes },
+            { operationScopes: failure.operationScopes, components: failure.components ?? [] },
           )
         }
       }
@@ -1144,7 +1163,10 @@ function applyDerivationFailures(calendarActuals, ltm, failures, years) {
   if (incompatible.some((item) => item.periodIdentity?.periodType === PERIOD_TYPE.STANDALONE_QUARTER) &&
       ltm.freeCashFlow?.value == null) {
     ltm.freeCashFlow = resultFailure(HISTORICAL_RESULT_STATUS.OPERATION_SCOPE_INCOMPATIBLE,
-      'OPERATION_SCOPE_INCOMPATIBLE', { missingPeriods: ltm.freeCashFlow?.missingPeriods ?? [] })
+      'OPERATION_SCOPE_INCOMPATIBLE', {
+        missingPeriods: ltm.freeCashFlow?.missingPeriods ?? [],
+        components: incompatible.flatMap((item) => item.components ?? []),
+      })
   }
 }
 

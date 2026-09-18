@@ -290,6 +290,7 @@ export function deriveCanonicalFreeCashFlow(cfoRecords = [], capexRecords = [], 
         capexSourceIds: periodMatches.map((item) => item.sourceId),
         periodIdentity: cfo.periodIdentity,
         operationScopes: [cfo.operationScope, ...periodMatches.map((item) => item.operationScope)],
+        components: [lineage(cfo), ...periodMatches.map(lineage)],
       })
       continue
     }

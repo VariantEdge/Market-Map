@@ -3,7 +3,7 @@ import { HISTORICAL_VALIDATION_STATUS } from './issuerClassification.js'
 import { createHash } from 'node:crypto'
 
 const DAY_MS = 24 * 60 * 60 * 1000
-export const ADJUSTED_EBITDA_ENGINE_VERSION = 'company-defined-adjusted-ebitda-v4-strict-definition-compatibility'
+export const ADJUSTED_EBITDA_ENGINE_VERSION = 'company-defined-adjusted-ebitda-v5-all-pair-definition-compatibility'
 const ALLOWED_FORMS = new Set([
   '10-K', '10-K/A', '10-Q', '10-Q/A', '8-K', '8-K/A',
   '20-F', '20-F/A', '40-F', '40-F/A', '6-K',
@@ -79,9 +79,10 @@ function definitionsCompatible(facts) {
   if (facts.length < 2) return true
   if (new Set(facts.map((fact) => fact.definitionFingerprint)).size === 1) return true
   const sets = facts.map(normalizedDefinitionTerms)
-  return sets.every((right, index) => {
-    if (!index) return true
-    const left = sets[index - 1]
+  const pairCompatible = (leftIndex, rightIndex) => {
+    if (facts[leftIndex].definitionFingerprint === facts[rightIndex].definitionFingerprint) return true
+    const left = sets[leftIndex]
+    const right = sets[rightIndex]
     if (left.size < 5 || right.size < 5) return false
     const shared = [...left].filter((term) => right.has(term))
     const unionSize = new Set([...left, ...right]).size
@@ -91,7 +92,9 @@ function definitionsCompatible(facts) {
     const largerCoverage = shared.length / Math.max(left.size, right.size)
     const jaccard = shared.length / unionSize
     return substantiveShared >= 2 && smallerCoverage >= 0.85 && largerCoverage >= 0.75 && jaccard >= 0.75
-  })
+  }
+  return sets.every((_, leftIndex) => sets.every((__, rightIndex) =>
+    rightIndex <= leftIndex || pairCompatible(leftIndex, rightIndex)))
 }
 
 function combinedDefinitionFingerprint(facts) {

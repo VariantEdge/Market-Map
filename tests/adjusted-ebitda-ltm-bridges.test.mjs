@@ -186,6 +186,28 @@ test('bridge rejects a materially changed definition despite overlapping generic
   assert.equal(result.validationStatus, 'DEFINITION_INCOMPATIBLE')
 })
 
+test('bridge requires definition compatibility across every input pair', () => {
+  const terms = {
+    fullYear: ['alpha adjustment', 'beta adjustment', 'gamma adjustment', 'delta adjustment',
+      'epsilon adjustment', 'zeta adjustment', 'eta adjustment', 'theta adjustment'],
+    currentYtd: ['alpha adjustment', 'beta adjustment', 'gamma adjustment', 'delta adjustment',
+      'epsilon adjustment', 'zeta adjustment', 'eta adjustment', 'iota adjustment'],
+    priorYtd: ['alpha adjustment', 'beta adjustment', 'gamma adjustment', 'delta adjustment',
+      'epsilon adjustment', 'zeta adjustment', 'iota adjustment', 'kappa adjustment'],
+  }
+  const records = calendarBridge().map((item, index) => ({
+    ...item,
+    definitionFingerprint: `all-pair-${index}`,
+    tableContext: {
+      ...item.tableContext,
+      rowLabels: index === 0 ? terms.fullYear : index === 1 ? terms.currentYtd : terms.priorYtd,
+    },
+  }))
+  const result = build(records)
+  assert.equal(result.value, null)
+  assert.equal(result.validationStatus, 'DEFINITION_INCOMPATIBLE')
+})
+
 test('bridge fails closed for mismatched currencies', () => {
   const records = calendarBridge()
   records[1] = { ...records[1], currency: 'EUR' }

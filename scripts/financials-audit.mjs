@@ -108,14 +108,16 @@ function compactAuditComponents(components = []) {
   return components.map((component) => ({
     sourceProvider: component.sourceProvider ?? component.provider ??
       (String(component.sourceType ?? '').startsWith('SEC') ? 'SEC' : null),
-    sourceStart: component.sourceStart ?? component.quarterStart ?? component.start ?? null,
-    sourceEnd: component.sourceEnd ?? component.quarterEnd ?? component.end ?? null,
-    fiscalYear: component.fiscalYear ?? null,
-    fiscalQuarter: component.fiscalQuarter ?? null,
-    fiscalCalendarId: component.fiscalCalendarId ?? null,
-    dateAuthority: component.dateAuthority ?? null,
+    sourceStart: component.sourceStart ?? component.quarterStart ?? component.start ??
+      component.periodIdentity?.periodStart ?? null,
+    sourceEnd: component.sourceEnd ?? component.quarterEnd ?? component.end ??
+      component.periodIdentity?.periodEnd ?? null,
+    fiscalYear: component.fiscalYear ?? component.periodIdentity?.fiscalYear ?? null,
+    fiscalQuarter: component.fiscalQuarter ?? component.periodIdentity?.fiscalQuarter ?? null,
+    fiscalCalendarId: component.fiscalCalendarId ?? component.periodIdentity?.fiscalCalendarId ?? null,
+    dateAuthority: component.dateAuthority ?? component.periodIdentity?.dateAuthority ?? null,
     economicPeriodKey: component.economicPeriodKey ?? null,
-    sourcePeriodType: component.sourcePeriodType ?? null,
+    sourcePeriodType: component.sourcePeriodType ?? component.periodIdentity?.periodType ?? null,
     sourcePeriodBasis: component.sourcePeriodBasis ?? null,
     sourceValue: component.sourceValue ?? null,
     sourceUrl: component.sourceUrl ?? null,
@@ -142,6 +144,9 @@ function compactAuditComponents(components = []) {
     reportedUnits: component.reportedUnits ?? null,
     normalizedValue: component.normalizedValue ?? component.value ?? null,
     definitionFingerprint: component.definitionFingerprint ?? null,
+    semanticDefinitionFingerprint: component.semanticDefinitionFingerprint ?? null,
+    sourceDefinitionFingerprint: component.sourceDefinitionFingerprint ?? null,
+    operationScope: component.operationScope ?? null,
     adjustedEbitdaMethod: component.adjustedEbitdaMethod ?? null,
     formula: component.formula ?? null,
     selectionDecision: component.selectionDecision ?? null,
@@ -308,7 +313,10 @@ const sanityFlags = filteredRecords.flatMap((record) => (record.economicSanityFl
 const auditIssues = changedOnly || statusOption ? [] : validateHistoricalAuditRecords(records, {
   tickers: requestedTickers, metrics, periods: [...years.map((year) => `${year}A`), 'LTM'],
 })
-const report = { generatedAt: new Date().toISOString(), tickers: requestedTickers, years, metrics, changedOnly, companyResults, summary: { totalCompanies: companyResults.length, totalHistoricalNumbers: filteredRecords.length, ...counts, failuresByRootCause, economicSanityFlagCount: sanityFlags.length, auditIssueCount: auditIssues.length }, sanityFlags, auditIssues, records: filteredRecords }
+const auditIssueCells = new Set(auditIssues.map((issue) => `${issue.ticker}|${issue.metric}|${issue.period}`))
+const acceptedNaCellsWithEvidence = changedOnly || statusOption ? 0 : records.filter((record) =>
+  record.displayedValue == null && !auditIssueCells.has(`${record.ticker}|${record.metric}|${record.calendarYear}`)).length
+const report = { generatedAt: new Date().toISOString(), tickers: requestedTickers, years, metrics, changedOnly, companyResults, summary: { totalCompanies: companyResults.length, totalHistoricalNumbers: filteredRecords.length, ...counts, unresolvedCellCount: auditIssueCells.size, acceptedNaCellsWithEvidence, failuresByRootCause, economicSanityFlagCount: sanityFlags.length, auditIssueCount: auditIssues.length }, sanityFlags, auditIssues, records: filteredRecords }
 
 await mkdir(outputDirectory, { recursive: true })
 const perTickerDirectory = path.join(outputDirectory, 'by-ticker')
