@@ -56,7 +56,8 @@ function hasCompletedNegativeSearchEvidence(record) {
   const evidence = record.negativeSearchEvidence
   if (!evidence || evidence.searchType !== 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA') return false
   if (evidence.completed !== true || evidence.timedOut === true || evidence.failed === true) return false
-  if (Number(evidence.eligibleReconciliationsFound) !== 0) return false
+  if (Number(evidence.eligibleReconciliationsByPeriod?.[record.calendarYear] ??
+      evidence.eligibleReconciliationsFound) !== 0) return false
   if (!(evidence.coveredPeriods ?? []).includes(String(record.calendarYear))) return false
   const filings = evidence.filingsExamined ?? []
   return filings.length > 0 && filings.every((filing) =>
@@ -72,6 +73,13 @@ function hasRequiredNullEvidence(record) {
   }
   if (record.validationStatus === 'NOT_REPORTED') {
     return hasCompletedNegativeSearchEvidence(record)
+  }
+  if (record.validationStatus === 'LEGITIMATE_NA') {
+    const evidence = record.nullEvidence
+    return evidence?.type === 'EXACT_CALENDAR_PERIOD_COVERAGE_GAP' &&
+      evidence.exactCalendarizationProhibited === true && evidence.targetStart && evidence.targetEnd &&
+      (evidence.availablePeriods ?? []).length >= 2 && (record.quarterlyComponents ?? []).length >= 2 &&
+      record.quarterlyComponents.every(hasComponentProvenance)
   }
   return true
 }

@@ -1168,12 +1168,18 @@ function applyDerivationFailures(calendarActuals, ltm, failures, years) {
       }
     }
   }
-  if (incompatible.some((item) => item.periodIdentity?.periodType === PERIOD_TYPE.STANDALONE_QUARTER) &&
-      ltm.freeCashFlow?.value == null) {
+  if (incompatible.length && ltm.freeCashFlow?.value == null) {
+    const latestFailures = incompatible.sort((left, right) =>
+      String(right.periodIdentity?.periodEnd ?? '').localeCompare(String(left.periodIdentity?.periodEnd ?? '')))
+    const latestEnd = latestFailures[0]?.periodIdentity?.periodEnd ?? null
+    const relevantFailures = latestEnd
+      ? latestFailures.filter((item) => item.periodIdentity?.periodEnd === latestEnd)
+      : latestFailures
     ltm.freeCashFlow = resultFailure(HISTORICAL_RESULT_STATUS.OPERATION_SCOPE_INCOMPATIBLE,
       'OPERATION_SCOPE_INCOMPATIBLE', {
         missingPeriods: ltm.freeCashFlow?.missingPeriods ?? [],
-        components: incompatible.flatMap((item) => item.components ?? []),
+        operationScopes: [...new Set(relevantFailures.flatMap((item) => item.operationScopes ?? []))],
+        components: relevantFailures.flatMap((item) => item.components ?? []),
       })
   }
 }

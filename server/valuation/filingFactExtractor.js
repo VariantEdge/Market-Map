@@ -204,10 +204,16 @@ function parseDateHeader(value) {
   return isoDate(Number(match[3]), month, Number(match[2]))
 }
 
-function contextualPeriodEnd(context, year) {
-  const match = normalizedCellText(context).match(/\b(?:(?:three|six|nine|twelve) months|year) ended\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})/i)
-  if (match) return parseDateHeader(`${match[1]} ${match[2]}, ${year}`)
-  return null
+function contextualPeriodEnd(context, year, reportDate = null) {
+  const matches = [...normalizedCellText(context).matchAll(/\b(?:(?:three|six|nine|twelve) months|year) ended\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})/gi)]
+  const candidates = [...new Set(matches.map((match) => parseDateHeader(`${match[1]} ${match[2]}, ${year}`)).filter(Boolean))]
+  if (!candidates.length) return null
+  const reportMonthDay = /^\d{4}-(\d{2}-\d{2})$/.exec(String(reportDate ?? ''))?.[1] ?? null
+  if (reportMonthDay) {
+    const matchingReportPeriod = candidates.filter((candidate) => candidate.endsWith(reportMonthDay))
+    if (matchingReportPeriod.length === 1) return matchingReportPeriod[0]
+  }
+  return candidates.length === 1 ? candidates[0] : null
 }
 
 function explicitHeaderCell(grid, headerRow, columnIndex, periodCellCount) {
@@ -286,7 +292,7 @@ function periodFromHeaders(headers, company, filing, context = '') {
           : /(?:twelve months|year) ended/i.test(context) ? { type: 'FISCAL_YEAR', months: 12 }
           : null
   if (contextualDuration) {
-    const contextualEnd = contextualPeriodEnd(context, year)
+    const contextualEnd = contextualPeriodEnd(context, year, filing.reportDate)
     if (!contextualEnd) return null
     const calendarAnnual = contextualDuration.type === 'FISCAL_YEAR' && contextualEnd.endsWith('-12-31')
     return {
@@ -682,6 +688,10 @@ export function extractStructuredFinancialTableFacts({
         }
         const period = periodFromHeaders(headerLabels, company, filing, `${context} ${tableText}`)
         if (!period) continue
+        const reportMonthDay = /^\d{4}-(\d{2}-\d{2})$/.exec(String(filing.reportDate ?? ''))?.[1] ?? null
+        if (['10-Q', '10-Q/A'].includes(String(filing.form).toUpperCase()) &&
+            ['QUARTER', 'YTD_6M', 'YTD_9M'].includes(period.type) && reportMonthDay &&
+            !period.endDate.endsWith(reportMonthDay)) continue
         const normalizedValue = Math.round(item.value * unitMetadata.reportedScale * 100) / 100
         const durationDays = Math.round((new Date(`${period.endDate}T12:00:00`) - new Date(`${period.startDate}T12:00:00`)) / DAY_MS) + 1
         if (!Number.isFinite(normalizedValue) || durationDays <= 0) continue
@@ -882,7 +892,7 @@ function likelyXbrlInstance(exhibit) {
   return !/(?:_cal|_def|_lab|_pre|filingsummary|metalinks|report|r\d+)\.xml$/i.test(exhibit.name)
 }
 
-export function selectSupplementalFilings({ filingIndex, years, maxFilings = 20 }) {
+export function selectSupplementalFilings({ filingIndex, years, maxFilings = 36 }) {
   const minimumYear = Math.min(...years) - 1
   const eligible = (filingIndex?.filings ?? [])
     .filter((filing) => DOCUMENT_FORMS.has(filing.form) && filing.filingUrl)
@@ -948,7 +958,7 @@ export function selectSupplementalFilings({ filingIndex, years, maxFilings = 20 
   ].map((filing) => [filing.accessionNumber, filing])).values()].slice(0, maxFilings)
 }
 
-export async function loadSupplementalFilingFacts({ company, filingIndex, years, maxFilings = 20, signal }) {
+export async function loadSupplementalFilingFacts({ company, filingIndex, years, maxFilings = 36, signal }) {
   const sourceCompany = {
     ...company,
     fiscalYearEnd: filingIndex?.company?.fiscalYearEnd ?? company?.fiscalYearEnd ?? null,
@@ -998,9 +1008,17 @@ export async function loadSupplementalFilingFacts({ company, filingIndex, years,
   const eligibleReconciliationsFound = records.filter((record) =>
     record.metricCandidates?.includes('adjustedEbitda') &&
     record.rawSourceType === 'SEC_NON_GAAP_RECONCILIATION_TABLE').length
-  const coveredAnnualYears = new Set(completedFilings
-    .map((filing) => Number(String(filing.reportDate ?? '').slice(0, 4)))
-    .filter(Number.isInteger))
+  const eligibleAdjustedEbitda = records.filter((record) => record.metricCandidates?.includes('adjustedEbitda') &&
+    record.rawSourceType === 'SEC_NON_GAAP_RECONCILIATION_TABLE' && record.startDate && record.endDate)
+  const eligibleReconciliationsByPeriod = Object.fromEntries(years.map((year) => [`${year}A`,
+    eligibleAdjustedEbitda.filter((record) => record.startDate <= `${year}-12-31` && record.endDate >= `${year}-01-01`).length]))
+  // A later filing can contain comparative disclosures for an earlier calendar
+  // year.  Treat the year as searched only when the completed extraction
+  // actually found period-bounded source content overlapping that year; the
+  // filing's cover/report date alone is neither necessary nor sufficient.
+  const coveredAnnualYears = new Set(years.filter((year) => records.some((record) =>
+    record.startDate && record.endDate &&
+    record.startDate <= `${year}-12-31` && record.endDate >= `${year}-01-01`)))
   const latestRequestedYear = Math.max(...years.map(Number).filter(Number.isFinite))
   const coveredPeriods = completed
     ? years.filter((year) => coveredAnnualYears.has(Number(year))).map((year) => `${year}A`)
@@ -1019,6 +1037,7 @@ export async function loadSupplementalFilingFacts({ company, filingIndex, years,
       requestedYears: [...years],
       coveredPeriods,
       eligibleReconciliationsFound,
+      eligibleReconciliationsByPeriod,
       filingsExamined: completedFilings,
       extractionErrors: errors,
     },

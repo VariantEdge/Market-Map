@@ -120,6 +120,21 @@ test('four exact calendar quarters cover every day exactly once', () => {
   assert.deepEqual(result.coverage.overlaps, [])
 })
 
+test('June fiscal year plus exact current and prior half-years reconstructs the calendar year', () => {
+  const common = { ticker: 'JUNECO', metric: 'revenue', definitionFingerprint: 'GAAP_REVENUE' }
+  const records = [
+    observation({ ...common, type: PERIOD_TYPE.FISCAL_YEAR, start: '2022-07-01', end: '2023-06-30', value: 75.509 }),
+    observation({ ...common, type: PERIOD_TYPE.YTD_6M, start: '2023-07-01', end: '2023-12-31', value: 76.971 }),
+    observation({ ...common, type: PERIOD_TYPE.YTD_6M, start: '2022-07-01', end: '2022-12-31', value: 29.967 }),
+  ]
+  const result = buildCalendarYear(records, 2023)
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED)
+  assert.equal(result.classification, CY_CLASSIFICATION.EXACT_DERIVED_CALENDAR_YEAR)
+  assert.ok(Math.abs(result.value - 122.513) < 1e-9)
+  assert.equal(result.derivation, 'FY_PLUS_CURRENT_COMPARABLE_PERIOD_MINUS_PRIOR_COMPARABLE_PERIOD')
+  assert.deepEqual(result.components.map((item) => item.sign), [1, 1, -1])
+})
+
 test('June FYE labels do not prevent exact CY when economic quarter boundaries align', () => {
   const quarters = calendarQuarters(2024, 'JUNECO').map((item, index) => observation({
     ticker: 'JUNECO', start: item.periodIdentity.periodStart, end: item.periodIdentity.periodEnd,
@@ -361,6 +376,18 @@ test('materially inconsistent four-quarter and FY/YTD LTM constructions fail clo
   assert.equal(result.reconciliation.selection, 'NONE_FAIL_CLOSED')
   assert.ok(result.components.some((item) => item.constructionCandidate === 'FOUR_QUARTERS'))
   assert.ok(result.components.some((item) => item.constructionCandidate === 'FY_YTD_BRIDGE'))
+})
+
+test('a newer valid bridge beats an older valid four-quarter construction without cross-period reconciliation', () => {
+  const bridge = ltmBridgeFacts('6M')
+  const quarters = calendarQuarters(2024, 'BRIDGE').map((item) => observation({
+    ticker: 'BRIDGE', metric: 'ebit', start: item.periodIdentity.periodStart, end: item.periodIdentity.periodEnd,
+    value: item.normalizedValue, definitionFingerprint: 'GAAP_EBIT',
+  }))
+  const result = buildLtm([...quarters, ...bridge], { asOfDate: '2026-01-01' })
+  assert.equal(result.value, 110)
+  assert.equal(result.ltmEnd, '2025-06-30')
+  assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
 })
 
 test('definition compatibility is limited to the latest four LTM contributors', () => {

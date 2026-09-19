@@ -205,6 +205,15 @@ export function enforceLtmFreshness(entry, expectedQuarterEnd) {
     .sort()
     .at(-1) ?? null
   if (latestComponentEnd && latestComponentEnd >= expectedQuarterEnd) return entry
+  if (entry.staleFailure?.value == null && entry.staleFailure?.validationStatus) {
+    return {
+      ...entry.staleFailure,
+      warnings: [
+        ...(entry.staleFailure.warnings ?? []),
+        `Latest valid LTM ends ${latestComponentEnd ?? 'unknown'}; newer source periods fail validation through ${expectedQuarterEnd}.`,
+      ],
+    }
+  }
   return {
     ...entry,
     value: null,

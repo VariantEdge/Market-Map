@@ -200,6 +200,24 @@ test('maps an explicit year in an adjacent header cell across SEC spacer columns
   ])
 })
 
+test('contextual comparative year uses the period end matching the filing report date', () => {
+  const quarterlyFiling = { ...filing, reportDate: '2026-06-30' }
+  const html = `<p>Prior annual discussion: year ended December 31.</p>
+    <p>Results for the three months ended June 30.</p>
+    <p>($ in millions)</p><table>
+      <tr><th>Metric</th><th>2026</th><th>2025</th></tr>
+      <tr><td>Net income</td><td>10</td><td>8</td></tr>
+      <tr><td>Depreciation and amortization</td><td>2</td><td>2</td></tr>
+      <tr><td>Interest expense</td><td>1</td><td>1</td></tr>
+      <tr><td>Income tax expense</td><td>1</td><td>1</td></tr>
+      <tr><td>Stock-based compensation</td><td>1</td><td>1</td></tr>
+      <tr><td>Adjusted EBITDA</td><td>15</td><td>13</td></tr>
+    </table>`
+  const facts = extractStructuredNonGaapTableFacts({ company, filing: quarterlyFiling, html })
+  assert.deepEqual(facts.map((item) => item.endDate), ['2026-06-30', '2025-06-30'])
+  assert.ok(facts.every((item) => item.periodType === 'QUARTER'))
+})
+
 test('accepts a structurally complete reconciliation whose adjustment rows omit Add or Less prefixes', () => {
   const quarterlyFiling = { ...filing, reportDate: '2026-04-30' }
   const html = `<p>Non-GAAP measures ($ in thousands)</p><table>

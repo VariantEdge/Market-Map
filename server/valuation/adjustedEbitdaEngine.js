@@ -78,23 +78,62 @@ function normalizedDefinitionTerms(fact) {
 function definitionsCompatible(facts) {
   if (facts.length < 2) return true
   if (new Set(facts.map((fact) => fact.definitionFingerprint)).size === 1) return true
-  const sets = facts.map(normalizedDefinitionTerms)
-  const pairCompatible = (leftIndex, rightIndex) => {
-    if (facts[leftIndex].definitionFingerprint === facts[rightIndex].definitionFingerprint) return true
-    const left = sets[leftIndex]
-    const right = sets[rightIndex]
+  const candidates = [...new Set(facts.flatMap((fact) => [fact, ...(fact.alternativeCandidates ?? [])]))]
+  const sets = new Map(candidates.map((fact) => [fact, normalizedDefinitionTerms(fact)]))
+  const equivalentFingerprints = new Map()
+  const connect = (left, right) => {
+    if (!left || !right) return
+    if (!equivalentFingerprints.has(left)) equivalentFingerprints.set(left, new Set())
+    if (!equivalentFingerprints.has(right)) equivalentFingerprints.set(right, new Set())
+    equivalentFingerprints.get(left).add(right)
+    equivalentFingerprints.get(right).add(left)
+  }
+  const fuzzyCompatible = (leftFact, rightFact) => {
+    const left = sets.get(leftFact)
+    const right = sets.get(rightFact)
     if (left.size < 5 || right.size < 5) return false
     const shared = [...left].filter((term) => right.has(term))
     const unionSize = new Set([...left, ...right]).size
     const generic = /\b(?:depreciation|amortization|interest|financial charges?|income taxes?|taxes?)\b/
     const substantiveShared = shared.filter((term) => !generic.test(term)).length
-    const smallerCoverage = shared.length / Math.min(left.size, right.size)
-    const largerCoverage = shared.length / Math.max(left.size, right.size)
-    const jaccard = shared.length / unionSize
-    return substantiveShared >= 2 && smallerCoverage >= 0.85 && largerCoverage >= 0.75 && jaccard >= 0.75
+    return substantiveShared >= 2 && shared.length / Math.min(left.size, right.size) >= 0.85 &&
+      shared.length / Math.max(left.size, right.size) >= 0.75 && shared.length / unionSize >= 0.75
   }
-  return sets.every((_, leftIndex) => sets.every((__, rightIndex) =>
-    rightIndex <= leftIndex || pairCompatible(leftIndex, rightIndex)))
+  for (let leftIndex = 0; leftIndex < candidates.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < candidates.length; rightIndex += 1) {
+      const left = candidates[leftIndex]
+      const right = candidates[rightIndex]
+      const samePeriod = left.startDate === right.startDate && left.endDate === right.endDate &&
+        left.periodType === right.periodType
+      const sameValue = finite(left.value) && finite(right.value) &&
+        Math.abs(Number(left.value) - Number(right.value)) <= Math.max(1, Math.abs(Number(left.value))) * 0.000001
+      const comparativeEvidence = samePeriod && sameValue && left.currency === right.currency &&
+        eligibleFact(left) && eligibleFact(right)
+      if (left.definitionFingerprint === right.definitionFingerprint || comparativeEvidence) {
+        connect(left.definitionFingerprint, right.definitionFingerprint)
+      }
+    }
+  }
+  const evidenceEquivalent = (left, right) => {
+    const queue = [left]
+    const seen = new Set(queue)
+    while (queue.length) {
+      const current = queue.shift()
+      if (current === right) return true
+      for (const next of equivalentFingerprints.get(current) ?? []) {
+        if (!seen.has(next)) { seen.add(next); queue.push(next) }
+      }
+    }
+    return false
+  }
+  const equivalentFacts = (fingerprint) => candidates.filter((candidate) =>
+    evidenceEquivalent(fingerprint, candidate.definitionFingerprint))
+  const pairCompatible = (left, right) => evidenceEquivalent(left.definitionFingerprint, right.definitionFingerprint) ||
+    equivalentFacts(left.definitionFingerprint).some((leftCandidate) =>
+      equivalentFacts(right.definitionFingerprint).some((rightCandidate) =>
+        fuzzyCompatible(leftCandidate, rightCandidate)))
+  return facts.every((left, leftIndex) => facts.every((right, rightIndex) =>
+    rightIndex <= leftIndex || pairCompatible(left, right)))
 }
 
 function combinedDefinitionFingerprint(facts) {
@@ -328,7 +367,7 @@ function unavailable(reason, components = [], evidenceExists = components.length
 function completedNegativeSearchForPeriod(evidence, period) {
   return evidence?.searchType === 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA' &&
     evidence.completed === true && evidence.timedOut !== true && evidence.failed !== true &&
-    Number(evidence.eligibleReconciliationsFound) === 0 &&
+    Number(evidence.eligibleReconciliationsByPeriod?.[period] ?? evidence.eligibleReconciliationsFound) === 0 &&
     (evidence.coveredPeriods ?? []).includes(String(period)) &&
     (evidence.filingsExamined ?? []).length > 0 &&
     evidence.filingsExamined.every((filing) =>
@@ -336,6 +375,35 @@ function completedNegativeSearchForPeriod(evidence, period) {
 }
 
 function withNegativeSearchEvidence(entry, period, evidence) {
+  const calendarYear = Number(String(period).replace(/A$/, ''))
+  const completedInventory = evidence?.completed === true && evidence.failed !== true && evidence.timedOut !== true &&
+    (evidence.filingsExamined ?? []).length > 0 && evidence.filingsExamined.every((filing) =>
+      filing.accessionNumber && filing.form && filing.extractionCompleted === true)
+  if (entry?.value == null && entry?.validationStatus === 'INSUFFICIENT_PERIOD_COVERAGE' &&
+      Number.isInteger(calendarYear) && completedInventory && Number(evidence.eligibleReconciliationsFound) > 0 &&
+      (evidence.requestedYears ?? []).map(Number).includes(calendarYear) && (entry.components ?? []).length >= 2) {
+    return {
+      ...entry,
+      validationStatus: 'LEGITIMATE_NA',
+      method: 'EXACT_CALENDAR_YEAR_NOT_REPORTED_OR_EXACTLY_DERIVABLE',
+      warnings: ['EXACT_CALENDAR_YEAR_NOT_REPORTED_OR_EXACTLY_DERIVABLE'],
+      negativeSearchEvidence: evidence,
+      nullEvidence: {
+        type: 'EXACT_CALENDAR_PERIOD_COVERAGE_GAP',
+        targetStart: `${calendarYear}-01-01`,
+        targetEnd: `${calendarYear}-12-31`,
+        exactCalendarizationProhibited: true,
+        availablePeriods: entry.components.map((item) => ({
+          sourceId: item.sourceId, periodType: item.sourcePeriodType,
+          periodStart: item.sourceStart, periodEnd: item.sourceEnd,
+        })),
+      },
+    }
+  }
+  if (entry?.value == null && entry?.validationStatus === 'INSUFFICIENT_PERIOD_COVERAGE' &&
+      completedNegativeSearchForPeriod(evidence, period)) {
+    return { ...entry, validationStatus: 'NOT_REPORTED', negativeSearchEvidence: evidence }
+  }
   if (entry?.value != null || entry?.validationStatus !== 'NOT_REPORTED') return entry
   if (completedNegativeSearchForPeriod(evidence, period)) {
     return { ...entry, negativeSearchEvidence: evidence }
@@ -387,7 +455,9 @@ function derivedCalendarYearEntry(year, facts) {
     const matches = facts.filter((fact) => fact.periodType === ADJUSTED_EBITDA_PERIOD.QUARTER &&
       fact.startDate === expected.startDate && fact.endDate === expected.endDate)
     if (matches.length !== 1) {
-      return unavailable('FOUR_EXACT_CALENDAR_QUARTERS_UNAVAILABLE', matches.map(component), facts.length > 0)
+      const evidence = facts.filter((fact) => fact.endDate >= `${year - 1}-01-01` && fact.startDate <= `${year + 1}-12-31`)
+        .slice(-12).map(component)
+      return unavailable('FOUR_EXACT_CALENDAR_QUARTERS_UNAVAILABLE', evidence, facts.length > 0)
     }
     quarters.push(matches[0])
   }
@@ -430,6 +500,22 @@ function shiftedYearMatches(left, right) {
     leftEnd.getUTCMonth() === rightEnd.getUTCMonth() &&
     leftEnd.getUTCDate() === rightEnd.getUTCDate() &&
     Math.abs(daysInclusive(left.startDate, left.endDate) - daysInclusive(right.startDate, right.endDate)) <= 1
+}
+
+function bridgedCalendarYearEntry(year, facts) {
+  const { candidates, failures } = ltmBridgeCandidates(facts)
+  const matching = candidates.filter((entry) => entry.ltmStart === `${year}-01-01` && entry.ltmEnd === `${year}-12-31`)
+  if (matching.length > 1) return unavailable('DUPLICATE_CALENDAR_YEAR_BRIDGES', matching.flatMap((entry) => entry.components))
+  if (matching.length === 1) {
+    const { ltmStart, ltmEnd, denominatorIdentity, ...candidate } = matching[0]
+    return withDenominatorIdentity({
+      ...candidate,
+      requestedPeriodType: ADJUSTED_EBITDA_PERIOD.CALENDAR_YEAR,
+      sourcePeriodType: ADJUSTED_EBITDA_PERIOD.CALENDAR_YEAR,
+      derivation: 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD_CALENDAR_YEAR',
+    })
+  }
+  return failures.find((entry) => entry.validationStatus === 'DEFINITION_INCOMPATIBLE') ?? null
 }
 
 function immediatelyPrecedes(left, right) {
@@ -562,9 +648,18 @@ function ltmEntry(facts) {
   const candidates = [...direct, ...fourQuarter.candidates, ...bridge.candidates]
     .sort((left, right) => right.ltmEnd.localeCompare(left.ltmEnd) ||
       (quality.get(right.derivation) ?? 0) - (quality.get(left.derivation) ?? 0))
-  if (candidates.length) return candidates[0]
-
   const failures = [...bridge.failures, ...fourQuarter.failures]
+  if (candidates.length) {
+    const newest = candidates[0]
+    const newerBlockingFailure = failures
+      .filter((entry) => ['DEFINITION_INCOMPATIBLE', HISTORICAL_VALIDATION_STATUS.REQUIRES_REVIEW]
+        .includes(entry.validationStatus))
+      .map((entry) => ({ entry, end: (entry.components ?? []).map((item) => item.sourceEnd).filter(Boolean).sort().at(-1) }))
+      .filter((item) => item.end && item.end > newest.ltmEnd)
+      .sort((left, right) => right.end.localeCompare(left.end))[0]
+    return newerBlockingFailure ? { ...newest, staleFailure: newerBlockingFailure.entry } : newest
+  }
+
   return failures.find((entry) => entry.validationStatus === 'DEFINITION_INCOMPATIBLE') ??
     failures.find((entry) => entry.validationStatus === HISTORICAL_VALIDATION_STATUS.REQUIRES_REVIEW) ??
     failures[0] ?? unavailable('FOUR_STANDALONE_QUARTERS_UNAVAILABLE', [], facts.length > 0)
@@ -578,7 +673,9 @@ export function buildCanonicalAdjustedEbitda({ company, rawLedger, years, negati
   const calendarActuals = Object.fromEntries(years.map((year) => {
     const direct = selected.find((fact) => fact.periodType === ADJUSTED_EBITDA_PERIOD.CALENDAR_YEAR &&
       fact.startDate === `${year}-01-01` && fact.endDate === `${year}-12-31`)
-    const entry = direct ? directCalendarYearEntry(direct) : derivedCalendarYearEntry(year, selected)
+    const fourQuarters = direct ? null : derivedCalendarYearEntry(year, selected)
+    const bridge = !direct && fourQuarters?.value == null ? bridgedCalendarYearEntry(year, selected) : null
+    const entry = direct ? directCalendarYearEntry(direct) : bridge?.value != null ? bridge : fourQuarters
     return [year, withNegativeSearchEvidence(entry, `${year}A`, negativeSearchEvidence)]
   }))
   return {
@@ -620,9 +717,15 @@ export function assertCanonicalAdjustedEbitdaEntry(entry, requestedPeriodType) {
       throw new Error('Direct calendar-year Adjusted EBITDA must come from one exact calendar-year source cell.')
     }
     if (entry.adjustedEbitdaMethod === ADJUSTED_EBITDA_METHOD.COMPANY_DEFINED_DERIVED &&
-        (entry.derivation !== 'SUM_OF_FOUR_EXACT_CALENDAR_QUARTERS' || entry.components.length !== 4 ||
-         entry.components.some((item) => item.sourcePeriodType !== ADJUSTED_EBITDA_PERIOD.QUARTER))) {
-      throw new Error('Derived calendar-year Adjusted EBITDA must use four exact calendar quarters.')
+        !((entry.derivation === 'SUM_OF_FOUR_EXACT_CALENDAR_QUARTERS' && entry.components.length === 4 &&
+          entry.components.every((item) => item.sourcePeriodType === ADJUSTED_EBITDA_PERIOD.QUARTER)) ||
+        (entry.derivation === 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD_CALENDAR_YEAR' && entry.components.length === 3 &&
+          entry.components[0].sourceStart === entry.components[2].sourceStart &&
+          nextDate(entry.components[2].sourceEnd).endsWith('-01-01') &&
+          entry.components[1].sourceEnd.endsWith('-12-31') &&
+          Number(entry.value) === Number(entry.components[0].normalizedValue) +
+            Number(entry.components[1].normalizedValue) - Number(entry.components[2].normalizedValue)))) {
+      throw new Error('Derived calendar-year Adjusted EBITDA must use exact quarters or an exact FY/YTD bridge.')
     }
   }
   if (requestedPeriodType === ADJUSTED_EBITDA_PERIOD.LTM) {

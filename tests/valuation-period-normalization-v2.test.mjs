@@ -67,6 +67,27 @@ test('materially conflicting WiseSheets and SEC values remain visible for review
   assert.ok(result.every((item) => item.conflicts[0].type === 'VALUE_CONFLICT'))
 })
 
+test('reported period boundaries beat conflicting inferred table rows for the same economic period', () => {
+  const reported = observation({ type: PERIOD_TYPE.FISCAL_YEAR, start: '2024-12-29', end: '2025-12-27',
+    value: 52_853, quarter: null, provider: 'SEC', sourceId: 'reported-xbrl' })
+  const inferred = createCanonicalObservation({
+    ...reported,
+    rawValue: 17_826,
+    normalizedValue: 17_826,
+    sourceId: 'inferred-segment-table',
+    periodIdentity: createPeriodIdentity({
+      periodType: PERIOD_TYPE.FISCAL_YEAR, periodStart: '2024-12-28', periodEnd: '2025-12-27',
+      dateAuthority: DATE_AUTHORITY.INFERRED, fiscalYear: 2025, fiscalCalendarId: 'SYNTH-CALENDAR',
+    }),
+  })
+  const result = deduplicateEconomicPeriods([inferred, reported])
+  assert.equal(result.length, 1)
+  assert.equal(result[0].normalizedValue, 52_853)
+  assert.equal(result[0].periodIdentity.dateAuthority, DATE_AUTHORITY.REPORTED)
+  assert.equal(result[0].selectionReason, 'AUTHORITATIVE_PERIOD_BOUNDARIES')
+  assert.equal(result[0].alternatives[0].sourceId, 'inferred-segment-table')
+})
+
 test('a later authoritative restatement overrides static provider priority', () => {
   const wise = observation({ type: PERIOD_TYPE.STANDALONE_QUARTER, start: '2024-04-01', end: '2024-06-30', value: 20, quarter: 2, filed: '2024-07-20' })
   const restated = observation({ type: PERIOD_TYPE.STANDALONE_QUARTER, start: '2024-04-01', end: '2024-06-30', value: 25, quarter: 2,
@@ -111,6 +132,17 @@ test('6M, 9M, and FY cumulative facts derive Q2, Q3, and Q4 with authoritative b
     assert.equal(item.reportedVsDerived, OBSERVATION_BASIS.DERIVED)
     assert.equal(item.derivation.inputs.length, 2)
   }
+})
+
+test('authoritative matching boundaries override stale fiscal labels during cumulative subtraction', () => {
+  const six = observation({ type: PERIOD_TYPE.YTD_6M, start: '2024-07-01', end: '2024-12-31',
+    value: 30, quarter: 2, fiscalYear: 2024 })
+  const nine = observation({ type: PERIOD_TYPE.YTD_9M, start: '2024-07-01', end: '2025-03-31',
+    value: 50, quarter: 3, fiscalYear: 2026 })
+  const derived = deriveStandaloneQuarters([six, nine])
+  assert.equal(derived.at(-1).normalizedValue, 20)
+  assert.equal(derived.at(-1).periodIdentity.periodStart, '2025-01-01')
+  assert.equal(derived.at(-1).periodIdentity.periodEnd, '2025-03-31')
 })
 
 test('incompatible cumulative scope cannot be subtracted into a quarter', () => {
@@ -198,4 +230,36 @@ test('restated cumulative periods are resolved before every downstream subtracti
   const result = deriveStandaloneQuarters(records)
   assert.deepEqual(result.map((item) => item.normalizedValue), [100, 160, 170, 220])
   assert.deepEqual(result.failures, [])
+})
+
+test('a later audited annual remainder supersedes an older directly reported fourth quarter', () => {
+  const directQ4 = observation({ type: PERIOD_TYPE.STANDALONE_QUARTER, start: '2025-10-01', end: '2025-12-31',
+    value: -234.5, quarter: 4, provider: 'SEC', filed: '2026-02-10', sourceId: 'older-earnings-q4' })
+  const nineMonths = observation({ type: PERIOD_TYPE.YTD_9M, start: '2025-01-01', end: '2025-09-30',
+    value: -361.7, quarter: 3, provider: 'SEC', filed: '2025-11-10', sourceId: 'nine-months' })
+  const annual = observation({ type: PERIOD_TYPE.FISCAL_YEAR, start: '2025-01-01', end: '2025-12-31',
+    value: -611.7, quarter: null, provider: 'SEC', filed: '2026-04-30', sourceId: 'audited-annual' })
+  const quarters = deriveStandaloneQuarters([directQ4, nineMonths, annual])
+  const q4 = quarters.find((item) => item.periodIdentity.periodEnd === '2025-12-31')
+  assert.ok(Math.abs(q4.normalizedValue + 250) < 1e-9)
+  assert.equal(q4.selectionReason, 'LATEST_AUTHORITATIVE_RESTATEMENT')
+  assert.ok(q4.alternatives.some((item) => item.sourceId === 'older-earnings-q4'))
+})
+
+test('Q4 derivation binds a current annual to matching boundaries when comparative annuals share its fiscal label', () => {
+  const directQ4 = observation({ type: PERIOD_TYPE.STANDALONE_QUARTER, start: '2025-10-01', end: '2025-12-31',
+    value: -234.5, quarter: 4, provider: 'SEC', filed: '2026-02-10', sourceId: 'older-earnings-q4' })
+  const nineMonths = observation({ type: PERIOD_TYPE.YTD_9M, start: '2025-01-01', end: '2025-09-30',
+    value: -361.7, quarter: 3, provider: 'SEC', filed: '2025-11-10', sourceId: 'nine-months' })
+  const comparative2023 = observation({ type: PERIOD_TYPE.FISCAL_YEAR, start: '2023-01-01', end: '2023-12-31',
+    value: -300, quarter: null, provider: 'SEC', filed: '2026-04-30', sourceId: 'comparative-2023' })
+  const comparative2024 = observation({ type: PERIOD_TYPE.FISCAL_YEAR, start: '2024-01-01', end: '2024-12-31',
+    value: -400, quarter: null, provider: 'SEC', filed: '2026-04-30', sourceId: 'comparative-2024' })
+  const annual = observation({ type: PERIOD_TYPE.FISCAL_YEAR, start: '2025-01-01', end: '2025-12-31',
+    value: -611.7, quarter: null, provider: 'SEC', filed: '2026-04-30', sourceId: 'audited-annual' })
+  const quarters = deriveStandaloneQuarters([directQ4, nineMonths, comparative2023, comparative2024, annual])
+  const q4 = quarters.find((item) => item.periodIdentity.periodEnd === '2025-12-31')
+  assert.ok(Math.abs(q4.normalizedValue + 250) < 1e-9)
+  assert.equal(q4.selectionReason, 'LATEST_AUTHORITATIVE_RESTATEMENT')
+  assert.equal(quarters.failures.some((failure) => failure.reason === 'AMBIGUOUS_CUMULATIVE_SOURCE_PERIOD'), false)
 })

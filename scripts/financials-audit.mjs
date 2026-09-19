@@ -209,6 +209,7 @@ function auditRecord({ company, ticker, cik, metric, period, entry, snapshot, cl
     compatibleDefinitionFingerprints: entry?.compatibleDefinitionFingerprints ?? null,
     economicSanityFlags: entry?.economicSanityFlags ?? [],
     negativeSearchEvidence: entry?.negativeSearchEvidence ?? null,
+    nullEvidence: entry?.nullEvidence ?? null,
   }
 }
 

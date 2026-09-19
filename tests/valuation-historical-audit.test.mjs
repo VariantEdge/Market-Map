@@ -28,7 +28,9 @@ test('historical audit accepts explicit fail-closed N/A and rejects stale generi
   const base = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
   const explicit = base.map((item) => item.metric === 'adjustedEbitda' && item.calendarYear === 'LTM'
     ? record(item.metric, item.calendarYear, { displayedValue: null, validationStatus: 'LEGITIMATE_NA',
-      quarterlyComponents: [], failureReason: 'LEGITIMATE_NA' }) : item)
+      quarterlyComponents: [evidenceComponent('gap-a'), evidenceComponent('gap-b')], failureReason: 'LEGITIMATE_NA',
+      nullEvidence: { type: 'EXACT_CALENDAR_PERIOD_COVERAGE_GAP', exactCalendarizationProhibited: true,
+        targetStart: '2025-01-01', targetEnd: '2025-12-31', availablePeriods: [{}, {}] } }) : item)
   assert.deepEqual(validateHistoricalAuditRecords(explicit, { tickers, metrics, periods }), [])
   const unjustified = explicit.map((item) => item.metric === 'revenue' && item.calendarYear === '2025A'
     ? record(item.metric, item.calendarYear, { displayedValue: null, validationStatus: 'UNVERIFIED', quarterlyComponents: [] }) : item)

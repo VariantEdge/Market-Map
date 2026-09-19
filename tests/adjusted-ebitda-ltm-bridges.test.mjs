@@ -5,6 +5,7 @@ import {
   assertCanonicalAdjustedEbitdaEntry,
   buildCanonicalAdjustedEbitda,
 } from '../server/valuation/adjustedEbitdaEngine.js'
+import { enforceLtmFreshness } from '../server/valuation/calendarization.js'
 
 const company = { ticker: 'SYNTH', name: 'Synthetic Corp.', cik: '0000000001' }
 
@@ -134,6 +135,18 @@ test('constructs a non-calendar fiscal-year LTM bridge from exact boundaries', (
   assertCanonicalAdjustedEbitdaEntry(result, ADJUSTED_EBITDA_PERIOD.LTM)
 })
 
+test('constructs an exact calendar year from a June fiscal year and comparable half-years', () => {
+  const rawLedger = [
+    fact({ type: 'FISCAL_YEAR', start: '2022-07-01', end: '2023-06-30', value: 100_000_000, fiscalYear: 2023 }),
+    fact({ type: 'YTD_6M', start: '2023-07-01', end: '2023-12-31', value: 60_000_000, fiscalYear: 2024 }),
+    fact({ type: 'YTD_6M', start: '2022-07-01', end: '2022-12-31', value: 40_000_000, fiscalYear: 2023 }),
+  ]
+  const result = buildCanonicalAdjustedEbitda({ company, rawLedger, years: [2023] }).calendarActuals[2023]
+  assert.equal(result.value, 120_000_000)
+  assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD_CALENDAR_YEAR')
+  assertCanonicalAdjustedEbitdaEntry(result, ADJUSTED_EBITDA_PERIOD.CALENDAR_YEAR)
+})
+
 test('bridge fails closed for mismatched definitions', () => {
   const records = calendarBridge().map((item, index) => ({ ...item, definitionFingerprint: `definition-${index}`,
     tableContext: { ...item.tableContext, rowLabels: [`unique-${index}`] } }))
@@ -160,6 +173,24 @@ test('bridge accepts a stable reconciliation taxonomy when period-specific adjus
     },
   }))
   assert.equal(build(records).value, 120_000_000)
+})
+
+test('identical comparative disclosure provides source-backed definition equivalence across filings', () => {
+  const [fullYear, currentYtd, priorYtd] = calendarBridge('YTD_9M')
+  fullYear.definitionFingerprint = 'older-definition'
+  currentYtd.definitionFingerprint = 'newer-definition'
+  priorYtd.definitionFingerprint = 'newer-definition'
+  const priorComparative = {
+    ...priorYtd,
+    definitionFingerprint: 'older-definition',
+    accessionNumber: `${priorYtd.accessionNumber}-older`,
+    filingDate: '2025-01-01',
+    provenance: { ...priorYtd.provenance, sourceId: `${priorYtd.provenance.sourceId}-older` },
+  }
+  priorYtd.filingDate = '2026-01-01'
+  const result = build([fullYear, currentYtd, priorYtd, priorComparative])
+  assert.equal(result.value, 120_000_000)
+  assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
 })
 
 test('bridge rejects a materially changed definition despite overlapping generic adjustment terms', () => {
@@ -300,6 +331,26 @@ test('invalid newer candidate does not beat an older valid candidate', () => {
   const result = build([directLtm('2024-01-01', '2024-12-31'), ...invalidBridge])
   assert.equal(result.derivation, 'DIRECT_REPORTED_LTM')
   assert.equal(result.ltmEnd, '2024-12-31')
+})
+
+test('a newer definition-incompatible construction is retained as stale-repair evidence', () => {
+  const older = fourQuarters(2025)
+  const newer = [
+    fact({ type: 'CALENDAR_YEAR', start: '2025-01-01', end: '2025-12-31', value: 100_000_000,
+      fiscalYear: 2025, fingerprint: 'annual-definition' }),
+    fact({ type: 'YTD_6M', start: '2026-01-01', end: '2026-06-30', value: 60_000_000,
+      fiscalYear: 2026, fingerprint: 'new-definition' }),
+    fact({ type: 'YTD_6M', start: '2025-01-01', end: '2025-06-30', value: 40_000_000,
+      fiscalYear: 2025, fingerprint: 'prior-definition' }),
+  ].map((item, index) => ({ ...item, tableContext: { ...item.tableContext, rowLabels: [`unique-${index}`] } }))
+  const result = build([...older, ...newer])
+  assert.equal(result.value, 100_000_000)
+  assert.equal(result.validationStatus, 'VERIFIED_DERIVED')
+  assert.equal(result.staleFailure.validationStatus, 'DEFINITION_INCOMPATIBLE')
+  assert.ok(result.staleFailure.components.some((item) => item.sourceEnd === '2026-06-30'))
+  const freshness = enforceLtmFreshness(result, '2026-06-30')
+  assert.equal(freshness.value, null)
+  assert.equal(freshness.validationStatus, 'DEFINITION_INCOMPATIBLE')
 })
 
 test('LTM invariant rejects tampered period identity and construction arithmetic', () => {

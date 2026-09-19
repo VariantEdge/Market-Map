@@ -98,6 +98,14 @@ function valuesAgree(left, right, tolerance = 0.001) {
 }
 
 function explicitRestatementWinner(left, right) {
+  const laterAnnualRemainder = [left, right]
+    .filter((item) => item.reportedVsDerived === OBSERVATION_BASIS.DERIVED &&
+      item.derivation?.method === 'FISCAL_YEAR_MINUS_YTD_9M')
+    .sort((a, b) => String(b.filingDate ?? '').localeCompare(String(a.filingDate ?? '')))[0]
+  const other = laterAnnualRemainder === left ? right : left
+  if (laterAnnualRemainder && String(laterAnnualRemainder.filingDate ?? '') > String(other?.filingDate ?? '')) {
+    return laterAnnualRemainder
+  }
   if (left.sourceProvider === right.sourceProvider && left.filingDate !== right.filingDate) {
     return String(right.filingDate ?? '').localeCompare(String(left.filingDate ?? '')) > 0 ? right : left
   }
@@ -118,6 +126,15 @@ function sourceRank(observation) {
   const provider = observation.sourceProvider.toUpperCase()
   return (provider === 'WISESHEETS' ? 300 : provider === 'SEC' ? 200 : 100) +
     (observation.accession ? 20 : 0) + (observation.sourceUrl ? 10 : 0)
+}
+
+function dateAuthorityRank(observation) {
+  return {
+    [DATE_AUTHORITY.REPORTED]: 3,
+    [DATE_AUTHORITY.DERIVED_FROM_REPORTED_BOUNDARIES]: 2,
+    [DATE_AUTHORITY.INFERRED]: 1,
+    [DATE_AUTHORITY.UNKNOWN]: 0,
+  }[observation?.periodIdentity?.dateAuthority] ?? 0
 }
 
 function preferredObservation(left, right) {
@@ -151,6 +168,29 @@ export function deduplicateEconomicPeriods(observations = []) {
       continue
     }
     const current = accepted[index]
+    const authoritativeAnnualRemainder = explicitRestatementWinner(current, observation)
+    if (authoritativeAnnualRemainder?.derivation?.method === 'FISCAL_YEAR_MINUS_YTD_9M') {
+      const loser = authoritativeAnnualRemainder === current ? observation : current
+      accepted[index] = {
+        ...authoritativeAnnualRemainder,
+        economicPeriodKey: current.economicPeriodKey,
+        alternatives: [...(authoritativeAnnualRemainder.alternatives ?? []), loser],
+        selectionReason: 'LATEST_AUTHORITATIVE_RESTATEMENT',
+      }
+      continue
+    }
+    const authorityDifference = dateAuthorityRank(observation) - dateAuthorityRank(current)
+    if (authorityDifference) {
+      const winner = authorityDifference > 0 ? observation : current
+      const loser = winner === current ? observation : current
+      accepted[index] = {
+        ...winner,
+        economicPeriodKey: current.economicPeriodKey,
+        alternatives: [...(winner.alternatives ?? []), loser],
+        selectionReason: 'AUTHORITATIVE_PERIOD_BOUNDARIES',
+      }
+      continue
+    }
     const restatement = explicitRestatementWinner(current, observation)
     if (!restatement && !valuesAgree(current, observation)) {
       const conflict = {
@@ -179,6 +219,12 @@ function cumulativePairFailure(current, prior) {
   if (!sameSeries(current, prior)) return 'INCOMPATIBLE_CUMULATIVE_SERIES'
   const a = current.periodIdentity
   const b = prior.periodIdentity
+  const authoritativeBoundaries = [a, b].every((period) =>
+    [DATE_AUTHORITY.REPORTED, DATE_AUTHORITY.DERIVED_FROM_REPORTED_BOUNDARIES].includes(period.dateAuthority) &&
+    period.periodStart && period.periodEnd)
+  if (authoritativeBoundaries) {
+    return a.periodStart === b.periodStart ? null : 'INCOMPATIBLE_FISCAL_COHORT'
+  }
   if (a.fiscalYear == null || b.fiscalYear == null || a.fiscalYear !== b.fiscalYear) {
     return 'INCOMPATIBLE_FISCAL_COHORT'
   }
@@ -271,9 +317,22 @@ export function deriveStandaloneQuarters(observations = []) {
     groups.get(key).push(observation)
   }
   for (const [cohortKey, group] of groups) {
-    const resolve = (type, quarter = null) => {
-      const candidates = group.filter((item) => item.periodIdentity.periodType === type &&
+    const resolve = (type, quarter = null, priorCumulative = null) => {
+      let candidates = group.filter((item) => item.periodIdentity.periodType === type &&
         (quarter == null || item.periodIdentity.fiscalQuarter === quarter))
+      // SEC comparative annual facts sometimes inherit the current filing's
+      // fiscal-year label.  When deriving Q4, bind the annual to the resolved
+      // nine-month period by its authoritative economic boundaries instead of
+      // accepting every comparative annual carrying that label.
+      if (type === PERIOD_TYPE.FISCAL_YEAR && priorCumulative?.observation) {
+        const priorPeriod = priorCumulative.observation.periodIdentity
+        candidates = candidates.filter((item) => {
+          const period = item.periodIdentity
+          const remainingDays = epochDay(period.periodEnd) - epochDay(priorPeriod.periodEnd)
+          return period.periodStart === priorPeriod.periodStart &&
+            Number.isFinite(remainingDays) && remainingDays >= 75 && remainingDays <= 110
+        })
+      }
       if (!candidates.length) return { observation: null, failure: null }
       const resolved = deduplicateEconomicPeriods(candidates)
       const conflicted = resolved.filter((item) => item.deduplicationStatus === 'REQUIRES_REVIEW')
@@ -295,7 +354,7 @@ export function deriveStandaloneQuarters(observations = []) {
     const q1 = resolve(PERIOD_TYPE.STANDALONE_QUARTER, 1)
     const six = resolve(PERIOD_TYPE.YTD_6M)
     const nine = resolve(PERIOD_TYPE.YTD_9M)
-    const year = resolve(PERIOD_TYPE.FISCAL_YEAR)
+    const year = resolve(PERIOD_TYPE.FISCAL_YEAR, null, nine)
     for (const source of [q1, six, nine, year]) if (source.failure) failures.push(source.failure)
     for (const [current, prior, fiscalQuarter, method] of [
       [six, q1, 2, 'YTD_6M_MINUS_Q1'],

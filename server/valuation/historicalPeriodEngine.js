@@ -173,6 +173,93 @@ function exactDerivedCalendarYearCandidate(observation, year) {
       .includes(input.periodIdentity?.dateAuthority) && input.deduplicationStatus !== 'REQUIRES_REVIEW')
 }
 
+function exactCalendarUnavailableEvidence(observations, year, coverage) {
+  const calendar = calendarRange(year)
+  const authoritative = observations.filter((item) => hasAuthoritativeBoundaries(item.periodIdentity) &&
+    item.deduplicationStatus !== 'REQUIRES_REVIEW' && item.sourceId)
+  const nonCalendarAnnuals = authoritative.filter((item) =>
+    [PERIOD_TYPE.FISCAL_YEAR, PERIOD_TYPE.CALENDAR_YEAR].includes(item.periodIdentity.periodType) &&
+    item.periodIdentity.durationDays >= 350 && item.periodIdentity.durationDays <= 378 &&
+    !(item.periodIdentity.periodStart === calendar.start && item.periodIdentity.periodEnd === calendar.end))
+  if (!nonCalendarAnnuals.length || authoritative.length < 2) return null
+  const evidenceItems = authoritative.filter((item) => item.periodIdentity.periodEnd >= `${year - 1}-01-01` &&
+    item.periodIdentity.periodStart <= `${year + 1}-12-31`).slice(-12)
+  return {
+    type: 'EXACT_CALENDAR_PERIOD_COVERAGE_GAP',
+    targetStart: calendar.start,
+    targetEnd: calendar.end,
+    exactCalendarizationProhibited: true,
+    missingRanges: coverage.gaps,
+    availablePeriods: evidenceItems.map((item) => ({
+      sourceId: item.sourceId,
+      periodType: item.periodIdentity.periodType,
+      periodStart: item.periodIdentity.periodStart,
+      periodEnd: item.periodIdentity.periodEnd,
+      dateAuthority: item.periodIdentity.dateAuthority,
+    })),
+    observations: evidenceItems,
+  }
+}
+
+function exactCalendarBridgeResult(observations, year) {
+  const calendar = calendarRange(year)
+  const eligible = observations.filter((item) => hasAuthoritativeBoundaries(item.periodIdentity) &&
+    item.normalizedValue != null && item.deduplicationStatus !== 'REQUIRES_REVIEW')
+  const currentPeriods = eligible.filter((item) => bridgePeriodKind(item) &&
+    item.periodIdentity.periodEnd === calendar.end)
+  const failures = []
+  for (const current of currentPeriods) {
+    const priorPeriods = eligible.filter((candidate) => candidate !== current &&
+      bridgePeriodKind(candidate) === bridgePeriodKind(current) && shiftedYearMatches(current, candidate))
+    for (const prior of priorPeriods) {
+      const fullYears = eligible.filter((candidate) =>
+        [PERIOD_TYPE.FISCAL_YEAR, PERIOD_TYPE.CALENDAR_YEAR].includes(candidate.periodIdentity.periodType) &&
+        candidate.periodIdentity.periodStart === prior.periodIdentity.periodStart &&
+        nextDate(candidate.periodIdentity.periodEnd) === current.periodIdentity.periodStart)
+      for (const fullYear of fullYears) {
+        if (nextDate(prior.periodIdentity.periodEnd) !== calendar.start) continue
+        const inputs = [fullYear, current, prior]
+        if (inputs.some((item) => item.scope !== 'CONSOLIDATED')) {
+          failures.push(unavailable(HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW, 'NON_CONSOLIDATED_SCOPE'))
+          continue
+        }
+        const operationScopes = new Set(inputs.map((item) => item.operationScope))
+        if (operationScopes.size !== 1) {
+          failures.push(unavailable(HISTORICAL_RESULT_STATUS.OPERATION_SCOPE_INCOMPATIBLE,
+            'OPERATION_SCOPE_INCOMPATIBLE', { components: inputs.map((item) =>
+              sourceComponent({ observation: item, overlapStart: null, overlapEnd: null }, false)) }))
+          continue
+        }
+        if (!sameSeries(inputs)) {
+          failures.push(unavailable(HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW, 'INCOMPATIBLE_SERIES'))
+          continue
+        }
+        if (!compatibleDefinitions(inputs)) {
+          failures.push(unavailable(HISTORICAL_RESULT_STATUS.DEFINITION_INCOMPATIBLE,
+            'DEFINITION_INCOMPATIBLE', { components: inputs.map((item) =>
+              sourceComponent({ observation: item, overlapStart: null, overlapEnd: null }, false)) }))
+          continue
+        }
+        const components = [
+          bridgeComponent(fullYear, 'FISCAL_YEAR', 1),
+          bridgeComponent(current, 'CURRENT_COMPARABLE_PERIOD', 1),
+          bridgeComponent(prior, 'PRIOR_COMPARABLE_PERIOD', -1),
+        ]
+        return {
+          value: components.reduce((total, item) => total + item.contribution, 0),
+          classification: CY_CLASSIFICATION.EXACT_DERIVED_CALENDAR_YEAR,
+          status: HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED,
+          reason: null,
+          derivation: 'FY_PLUS_CURRENT_COMPARABLE_PERIOD_MINUS_PRIOR_COMPARABLE_PERIOD',
+          components,
+          coverage: { complete: true, gaps: [], overlaps: [], totalDays: inclusiveDays(calendar.start, calendar.end) },
+        }
+      }
+    }
+  }
+  return failures[0] ?? null
+}
+
 export function buildCalendarYear(observations = [], year) {
   const normalizedYear = Number(year)
   const deduped = deduplicateEconomicPeriods(observations)
@@ -212,6 +299,9 @@ export function buildCalendarYear(observations = [], year) {
     }
   }
 
+  const exactBridge = exactCalendarBridgeResult(deduped, normalizedYear)
+  if (exactBridge) return exactBridge
+
   const quarters = deduped.filter((item) => item.periodIdentity.periodType === PERIOD_TYPE.STANDALONE_QUARTER &&
     hasAuthoritativeBoundaries(item.periodIdentity))
   const contributingConflict = quarters.find((item) => item.deduplicationStatus === 'REQUIRES_REVIEW' &&
@@ -222,7 +312,19 @@ export function buildCalendarYear(observations = [], year) {
   }
   const coverage = coverageAnalysis(quarters, normalizedYear)
   if (coverage.overlaps.length) return unavailable(HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW, 'OVERLAPPING_PERIOD_COVERAGE', { coverage })
-  if (!coverage.complete) return unavailable(HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE, 'INSUFFICIENT_PERIOD_COVERAGE', { coverage })
+  if (!coverage.complete) {
+    const nullEvidence = exactCalendarUnavailableEvidence(deduped, normalizedYear, coverage)
+    if (nullEvidence) {
+      return unavailable(HISTORICAL_RESULT_STATUS.LEGITIMATE_NA,
+        'EXACT_CALENDAR_YEAR_NOT_REPORTED_OR_EXACTLY_DERIVABLE', {
+          coverage,
+          nullEvidence: { ...nullEvidence, observations: undefined },
+          components: nullEvidence.observations.map((observation) =>
+            sourceComponent({ observation, overlapStart: null, overlapEnd: null }, false)),
+        })
+    }
+    return unavailable(HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE, 'INSUFFICIENT_PERIOD_COVERAGE', { coverage })
+  }
   const contributors = coverage.intervals.map((item) => item.observation)
   if (!sameSeries(contributors)) return unavailable(HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW, 'INCOMPATIBLE_SERIES', { coverage })
   if (contributors.some((item) => item.scope !== 'CONSOLIDATED')) {
@@ -581,6 +683,8 @@ function buildFourQuarterLtm(observations, { asOfDate, latestReportedPeriod }) {
       overlapStart: epochDay(item.periodIdentity.periodStart),
       overlapEnd: epochDay(item.periodIdentity.periodEnd),
     }, false)),
+    ltmStart: selected[0].periodIdentity.periodStart,
+    ltmEnd: selected.at(-1).periodIdentity.periodEnd,
     latestIngestedPeriod: selected.at(-1).periodIdentity.periodEnd,
     latestReportedPeriod: latestReportedPeriod?.valid ? latestReportedPeriod : null,
   }
@@ -593,6 +697,9 @@ export function buildLtm(observations = [], { asOfDate = '9999-12-31', latestRep
   const fourQuarter = buildFourQuarterLtm(deduped, { asOfDate, latestReportedPeriod })
   const bridge = ltmBridgeResult(deduped, { asOfDate, latestReportedPeriod })
   if (fourQuarter.value != null && bridge.value != null) {
+    if (fourQuarter.ltmEnd !== bridge.ltmEnd) {
+      return fourQuarter.ltmEnd > bridge.ltmEnd ? fourQuarter : bridge
+    }
     const tolerance = Math.max(1, Math.abs(bridge.value) * 0.005)
     if (Math.abs(fourQuarter.value - bridge.value) <= tolerance) {
       return {
