@@ -3,7 +3,7 @@ import { HISTORICAL_VALIDATION_STATUS } from './issuerClassification.js'
 import { createHash } from 'node:crypto'
 
 const DAY_MS = 24 * 60 * 60 * 1000
-export const ADJUSTED_EBITDA_ENGINE_VERSION = 'company-defined-adjusted-ebitda-v5-all-pair-definition-compatibility'
+export const ADJUSTED_EBITDA_ENGINE_VERSION = 'company-defined-adjusted-ebitda-v6-source-backed-definition-equivalence'
 const ALLOWED_FORMS = new Set([
   '10-K', '10-K/A', '10-Q', '10-Q/A', '8-K', '8-K/A',
   '20-F', '20-F/A', '40-F', '40-F/A', '6-K',
@@ -103,13 +103,7 @@ function definitionsCompatible(facts) {
     for (let rightIndex = leftIndex + 1; rightIndex < candidates.length; rightIndex += 1) {
       const left = candidates[leftIndex]
       const right = candidates[rightIndex]
-      const samePeriod = left.startDate === right.startDate && left.endDate === right.endDate &&
-        left.periodType === right.periodType
-      const sameValue = finite(left.value) && finite(right.value) &&
-        Math.abs(Number(left.value) - Number(right.value)) <= Math.max(1, Math.abs(Number(left.value))) * 0.000001
-      const comparativeEvidence = samePeriod && sameValue && left.currency === right.currency &&
-        eligibleFact(left) && eligibleFact(right)
-      if (left.definitionFingerprint === right.definitionFingerprint || comparativeEvidence) {
+      if (left.definitionFingerprint === right.definitionFingerprint) {
         connect(left.definitionFingerprint, right.definitionFingerprint)
       }
     }

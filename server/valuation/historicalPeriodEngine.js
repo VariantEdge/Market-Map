@@ -175,6 +175,13 @@ function exactDerivedCalendarYearCandidate(observation, year) {
 
 function exactCalendarUnavailableEvidence(observations, year, coverage) {
   const calendar = calendarRange(year)
+  const metric = observations.find((item) => item.metric)?.metric ?? null
+  const sourceSearchCompleteness = observations.map((item) => item.sourceSearchCompleteness).find((evidence) =>
+    evidence?.completed === true && evidence?.failed !== true && evidence?.timedOut !== true &&
+    evidence.metric === metric && evidence.targetStart === calendar.start && evidence.targetEnd === calendar.end &&
+    (evidence.sourcesExamined ?? []).length > 0 && evidence.sourcesExamined.every((source) =>
+      source.sourceId && source.extractionCompleted === true))
+  if (!sourceSearchCompleteness) return null
   const authoritative = observations.filter((item) => hasAuthoritativeBoundaries(item.periodIdentity) &&
     item.deduplicationStatus !== 'REQUIRES_REVIEW' && item.sourceId)
   const nonCalendarAnnuals = authoritative.filter((item) =>
@@ -189,6 +196,8 @@ function exactCalendarUnavailableEvidence(observations, year, coverage) {
     targetStart: calendar.start,
     targetEnd: calendar.end,
     exactCalendarizationProhibited: true,
+    metric,
+    sourceSearchCompleteness,
     missingRanges: coverage.gaps,
     availablePeriods: evidenceItems.map((item) => ({
       sourceId: item.sourceId,
@@ -300,7 +309,8 @@ export function buildCalendarYear(observations = [], year) {
   }
 
   const exactBridge = exactCalendarBridgeResult(deduped, normalizedYear)
-  if (exactBridge) return exactBridge
+  if ([HISTORICAL_RESULT_STATUS.VERIFIED_REPORTED, HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED]
+    .includes(exactBridge?.status)) return exactBridge
 
   const quarters = deduped.filter((item) => item.periodIdentity.periodType === PERIOD_TYPE.STANDALONE_QUARTER &&
     hasAuthoritativeBoundaries(item.periodIdentity))
@@ -323,6 +333,7 @@ export function buildCalendarYear(observations = [], year) {
             sourceComponent({ observation, overlapStart: null, overlapEnd: null }, false)),
         })
     }
+    if (exactBridge) return exactBridge
     return unavailable(HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE, 'INSUFFICIENT_PERIOD_COVERAGE', { coverage })
   }
   const contributors = coverage.intervals.map((item) => item.observation)

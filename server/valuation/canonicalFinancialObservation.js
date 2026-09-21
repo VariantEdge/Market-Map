@@ -162,6 +162,7 @@ export function createCanonicalObservation(input = {}) {
     definitionFingerprint: input.semanticDefinitionFingerprint ?? input.definitionFingerprint ?? null,
     retrievedAt: input.retrievedAt ?? null,
     restatedOrRecast: input.restatedOrRecast === true,
+    sourceSearchCompleteness: input.sourceSearchCompleteness ?? null,
     warnings: [...(input.warnings ?? [])],
   }
   const validation = validateCanonicalObservation(observation)

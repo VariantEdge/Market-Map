@@ -22,14 +22,15 @@ function observation({ ticker = 'NEWCO', type = PERIOD_TYPE.STANDALONE_QUARTER, 
   provider = 'WiseSheets', sourceId, definitionFingerprint = null, scope = 'CONSOLIDATED',
   semanticDefinitionFingerprint = null, sourceDefinitionFingerprint = null, derivation = null,
   reportedVsDerived = OBSERVATION_BASIS.REPORTED, restatedOrRecast = false,
-  operationScope = 'UNSPECIFIED', currency = 'USD', units = 'USD', metric = 'revenue' }) {
+  operationScope = 'UNSPECIFIED', currency = 'USD', units = 'USD', metric = 'revenue',
+  sourceSearchCompleteness = null }) {
   return createCanonicalObservation({
     ticker, issuerId: `${ticker}-ISSUER`, metric, rawValue: value, normalizedValue: value,
     rawUnits: units, normalizedUnits: units, currency, sourceProvider: provider,
     sourceId: sourceId ?? `${provider}:${ticker}:${start}:${end}`, filingDate: end,
     sourceUrl: `https://example.test/${provider}/${ticker}`, accession: `${provider}-${ticker}-${end}`,
     scope, operationScope, reportedVsDerived, definitionFingerprint, semanticDefinitionFingerprint,
-    sourceDefinitionFingerprint, derivation, restatedOrRecast,
+    sourceDefinitionFingerprint, derivation, restatedOrRecast, sourceSearchCompleteness,
     periodIdentity: createPeriodIdentity({
       periodType: type, periodStart: start, periodEnd: end, dateAuthority,
       fiscalYear, fiscalQuarter, fiscalCalendarId: `${ticker}-CALENDAR`, sequenceIndex,
@@ -180,6 +181,41 @@ test('missing middle quarter and incomplete IPO history fail closed for uncovere
     assert.equal(result.status, HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE)
     assert.ok(result.coverage.gaps.length > 0)
   }
+})
+
+test('non-calendar annual plus partial periods is unresolved without complete source-search evidence', () => {
+  const records = [
+    observation({ ticker: 'AUGCO', type: PERIOD_TYPE.FISCAL_YEAR, start: '2023-09-01', end: '2024-08-31',
+      value: 100, fiscalYear: 2024 }),
+    observation({ ticker: 'AUGCO', type: PERIOD_TYPE.STANDALONE_QUARTER, start: '2024-01-01', end: '2024-03-31',
+      value: 20, fiscalYear: 2024, fiscalQuarter: 2 }),
+    observation({ ticker: 'AUGCO', type: PERIOD_TYPE.STANDALONE_QUARTER, start: '2024-04-01', end: '2024-06-30',
+      value: 25, fiscalYear: 2024, fiscalQuarter: 3 }),
+  ]
+  const result = buildCalendarYear(records, 2024)
+  assert.equal(result.value, null)
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE)
+  assert.equal(result.nullEvidence, undefined)
+})
+
+test('failed exact-calendar bridge does not preempt four valid exact calendar quarters', () => {
+  const bridge = [
+    observation({ ticker: 'BRIDGE', metric: 'revenue', type: PERIOD_TYPE.FISCAL_YEAR,
+      start: '2023-07-01', end: '2024-06-30', value: 100, definitionFingerprint: 'OLD' }),
+    observation({ ticker: 'BRIDGE', metric: 'revenue', type: PERIOD_TYPE.YTD_6M,
+      start: '2024-07-01', end: '2024-12-31', value: 60, definitionFingerprint: 'NEW' }),
+    observation({ ticker: 'BRIDGE', metric: 'revenue', type: PERIOD_TYPE.YTD_6M,
+      start: '2023-07-01', end: '2023-12-31', value: 40, definitionFingerprint: 'OLD' }),
+  ]
+  const quarters = calendarQuarters(2024, 'BRIDGE').map((item) => ({
+    ...item,
+    semanticDefinitionFingerprint: 'CANONICAL_CONSOLIDATED_GAAP_REVENUE',
+    definitionFingerprint: 'CANONICAL_CONSOLIDATED_GAAP_REVENUE',
+  }))
+  const result = buildCalendarYear([...bridge, ...quarters], 2024)
+  assert.equal(result.value, 10)
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED)
+  assert.equal(result.classification, CY_CLASSIFICATION.EXACT_FROM_CALENDAR_QUARTERS)
 })
 
 test('overlapping periods are rejected and no calendar day can contribute twice', () => {

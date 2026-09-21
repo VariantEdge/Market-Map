@@ -64,6 +64,31 @@ function hasCompletedNegativeSearchEvidence(record) {
     filing.accessionNumber && filing.form && filing.extractionCompleted === true)
 }
 
+function hasCompletedExactCalendarSearchEvidence(record, evidence) {
+  const search = evidence?.sourceSearchCompleteness
+  const expectedYear = Number(String(record.calendarYear).replace(/A$/, ''))
+  if (!Number.isInteger(expectedYear) || !search) return false
+  if (search.completed !== true || search.failed === true || search.timedOut === true) return false
+  if (search.metric !== record.metric || search.targetStart !== `${expectedYear}-01-01` ||
+      search.targetEnd !== `${expectedYear}-12-31`) return false
+  const sources = search.sourcesExamined ?? []
+  return sources.length > 0 && sources.every((source) =>
+    source.sourceId && source.extractionCompleted === true)
+}
+
+function hasCompletedCompanyMetricInventoryEvidence(record) {
+  const evidence = record.negativeSearchEvidence
+  const calendarYear = Number(String(record.calendarYear).replace(/A$/, ''))
+  if (record.metric !== 'adjustedEbitda' || !Number.isInteger(calendarYear) ||
+      evidence?.searchType !== 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA') return false
+  if (evidence.completed !== true || evidence.failed === true || evidence.timedOut === true) return false
+  if (!(evidence.requestedYears ?? []).map(Number).includes(calendarYear) ||
+      Number(evidence.eligibleReconciliationsFound) <= 0) return false
+  const filings = evidence.filingsExamined ?? []
+  return filings.length > 0 && filings.every((filing) =>
+    filing.accessionNumber && filing.form && filing.extractionCompleted === true)
+}
+
 function hasRequiredNullEvidence(record) {
   if (record.validationStatus === 'DEFINITION_INCOMPATIBLE') {
     return hasDefinitionIncompatibilityEvidence(record)
@@ -78,6 +103,8 @@ function hasRequiredNullEvidence(record) {
     const evidence = record.nullEvidence
     return evidence?.type === 'EXACT_CALENDAR_PERIOD_COVERAGE_GAP' &&
       evidence.exactCalendarizationProhibited === true && evidence.targetStart && evidence.targetEnd &&
+      (hasCompletedExactCalendarSearchEvidence(record, evidence) ||
+        hasCompletedCompanyMetricInventoryEvidence(record)) &&
       (evidence.availablePeriods ?? []).length >= 2 && (record.quarterlyComponents ?? []).length >= 2 &&
       record.quarterlyComponents.every(hasComponentProvenance)
   }

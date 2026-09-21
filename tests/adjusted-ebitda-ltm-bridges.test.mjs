@@ -175,7 +175,7 @@ test('bridge accepts a stable reconciliation taxonomy when period-specific adjus
   assert.equal(build(records).value, 120_000_000)
 })
 
-test('identical comparative disclosure provides source-backed definition equivalence across filings', () => {
+test('identical comparative disclosure remains compatible only when reconciliation taxonomy also matches', () => {
   const [fullYear, currentYtd, priorYtd] = calendarBridge('YTD_9M')
   fullYear.definitionFingerprint = 'older-definition'
   currentYtd.definitionFingerprint = 'newer-definition'
@@ -191,6 +191,37 @@ test('identical comparative disclosure provides source-backed definition equival
   const result = build([fullYear, currentYtd, priorYtd, priorComparative])
   assert.equal(result.value, 120_000_000)
   assert.equal(result.derivation, 'FY_PLUS_CURRENT_YTD_MINUS_PRIOR_YTD')
+})
+
+test('identical comparative-period value alone does not prove changed definitions equivalent', () => {
+  const [fullYear, currentYtd, priorYtd] = calendarBridge('YTD_9M')
+  const olderTerms = [
+    'Adjusted EBITDA', 'Depreciation and amortization', 'Interest expense', 'Provision for income taxes',
+    'Restructuring charges', 'Acquisition costs', 'Legal settlements', 'Foreign exchange',
+  ]
+  const newerTerms = [
+    'Adjusted EBITDA', 'Depreciation and amortization', 'Interest expense', 'Provision for income taxes',
+    'Stock-based compensation', 'Digital asset remeasurement', 'Customer contract termination',
+    'Founder liquidity program',
+  ]
+  fullYear.definitionFingerprint = 'older-definition'
+  fullYear.tableContext = { ...fullYear.tableContext, rowLabels: olderTerms }
+  currentYtd.definitionFingerprint = 'newer-definition'
+  currentYtd.tableContext = { ...currentYtd.tableContext, rowLabels: newerTerms }
+  priorYtd.definitionFingerprint = 'newer-definition'
+  priorYtd.tableContext = { ...priorYtd.tableContext, rowLabels: newerTerms }
+  const sameValueOlderComparative = {
+    ...priorYtd,
+    definitionFingerprint: 'older-definition',
+    accessionNumber: `${priorYtd.accessionNumber}-older`,
+    filingDate: '2025-01-01',
+    provenance: { ...priorYtd.provenance, sourceId: `${priorYtd.provenance.sourceId}-older` },
+    tableContext: { ...priorYtd.tableContext, rowLabels: olderTerms },
+  }
+  priorYtd.filingDate = '2026-01-01'
+  const result = build([fullYear, currentYtd, priorYtd, sameValueOlderComparative])
+  assert.equal(result.value, null)
+  assert.equal(result.validationStatus, 'DEFINITION_INCOMPATIBLE')
 })
 
 test('bridge rejects a materially changed definition despite overlapping generic adjustment terms', () => {

@@ -24,18 +24,39 @@ test('historical audit requires exactly seven metrics across all requested actua
     .some((issue) => issue.metric === 'ebit' && issue.period === 'LTM' && issue.reason === 'MISSING_AUDIT_CELL'))
 })
 
-test('historical audit accepts explicit fail-closed N/A and rejects stale generic nulls', () => {
+test('historical audit accepts evidenced fail-closed N/A and rejects stale generic nulls', () => {
   const base = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
-  const explicit = base.map((item) => item.metric === 'adjustedEbitda' && item.calendarYear === 'LTM'
+  const explicit = base.map((item) => item.metric === 'revenue' && item.calendarYear === '2025A'
     ? record(item.metric, item.calendarYear, { displayedValue: null, validationStatus: 'LEGITIMATE_NA',
       quarterlyComponents: [evidenceComponent('gap-a'), evidenceComponent('gap-b')], failureReason: 'LEGITIMATE_NA',
       nullEvidence: { type: 'EXACT_CALENDAR_PERIOD_COVERAGE_GAP', exactCalendarizationProhibited: true,
-        targetStart: '2025-01-01', targetEnd: '2025-12-31', availablePeriods: [{}, {}] } }) : item)
+        targetStart: '2025-01-01', targetEnd: '2025-12-31', availablePeriods: [{}, {}],
+        sourceSearchCompleteness: completedCalendarSearchEvidence('revenue', 2025) } }) : item)
   assert.deepEqual(validateHistoricalAuditRecords(explicit, { tickers, metrics, periods }), [])
   const unjustified = explicit.map((item) => item.metric === 'revenue' && item.calendarYear === '2025A'
     ? record(item.metric, item.calendarYear, { displayedValue: null, validationStatus: 'UNVERIFIED', quarterlyComponents: [] }) : item)
   assert.ok(validateHistoricalAuditRecords(unjustified, { tickers, metrics, periods })
     .some((issue) => issue.metric === 'revenue' && issue.reason === 'UNJUSTIFIED_NULL'))
+})
+
+test('historical audit rejects LEGITIMATE_NA backed only by a fabricated coverage object', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  const target = records.find((item) => item.metric === 'revenue' && item.calendarYear === '2025A')
+  Object.assign(target, {
+    displayedValue: null,
+    validationStatus: 'LEGITIMATE_NA',
+    failureReason: 'EXACT_CALENDAR_YEAR_NOT_REPORTED_OR_EXACTLY_DERIVABLE',
+    quarterlyComponents: [evidenceComponent('gap-a'), evidenceComponent('gap-b')],
+    nullEvidence: {
+      type: 'EXACT_CALENDAR_PERIOD_COVERAGE_GAP',
+      exactCalendarizationProhibited: true,
+      targetStart: '2025-01-01',
+      targetEnd: '2025-12-31',
+      availablePeriods: [{}, {}],
+    },
+  })
+  assert.ok(validateHistoricalAuditRecords(records, { tickers, metrics, periods }).some((issue) =>
+    issue.reason === 'NULL_WITHOUT_POSITIVE_EVIDENCE' && issue.status === 'LEGITIMATE_NA'))
 })
 
 function evidenceComponent(sourceId, overrides = {}) {
@@ -59,6 +80,40 @@ function completedNegativeSearchEvidence(period = '2025A') {
     }],
   }
 }
+
+function completedCalendarSearchEvidence(metric = 'adjustedEbitda', year = 2025) {
+  return {
+    completed: true,
+    failed: false,
+    timedOut: false,
+    metric,
+    targetStart: `${year}-01-01`,
+    targetEnd: `${year}-12-31`,
+    sourcesExamined: [{ sourceId: 'SEC:0001-25-000001', extractionCompleted: true }],
+  }
+}
+
+test('historical audit accepts Adjusted EBITDA calendar N/A only after a complete company-metric inventory search', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  const target = records.find((item) => item.metric === 'adjustedEbitda' && item.calendarYear === '2025A')
+  const negativeSearchEvidence = completedNegativeSearchEvidence('2025A')
+  Object.assign(negativeSearchEvidence, { requestedYears: [2023, 2024, 2025], eligibleReconciliationsFound: 2 })
+  Object.assign(target, {
+    displayedValue: null,
+    validationStatus: 'LEGITIMATE_NA',
+    failureReason: 'EXACT_CALENDAR_YEAR_NOT_REPORTED_OR_EXACTLY_DERIVABLE',
+    negativeSearchEvidence,
+    quarterlyComponents: [evidenceComponent('partial-a'), evidenceComponent('partial-b')],
+    nullEvidence: {
+      type: 'EXACT_CALENDAR_PERIOD_COVERAGE_GAP',
+      exactCalendarizationProhibited: true,
+      targetStart: '2025-01-01',
+      targetEnd: '2025-12-31',
+      availablePeriods: [{ sourceId: 'partial-a' }, { sourceId: 'partial-b' }],
+    },
+  })
+  assert.deepEqual(validateHistoricalAuditRecords(records, { tickers, metrics, periods }), [])
+})
 
 test('historical audit rejects NOT_REPORTED without completed filing-search evidence', () => {
   const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
