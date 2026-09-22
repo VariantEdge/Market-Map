@@ -137,8 +137,9 @@ function inferredUnits(value, rowText = '') {
     : /\b(?:eur|euros?)\b|€/.test(input) || /€/.test(rowText) ? 'EUR'
       : /\b(?:gbp|pounds? sterling)\b|£/.test(input) || /£/.test(rowText) ? 'GBP'
         : null
-  const match = input.match(/(?:in|amounts? in|\$\s*in)\s+(?:(?:usd|eur|gbp|u\.s\. dollars?)\s+)?(thousands|millions|billions)|\b(?:usd|eur|gbp)\s+(thousands|millions|billions)|\$\s*\(?0{3}s?\)?|\$000s?/i)
-  const scaleLabel = (match?.[1] ?? match?.[2])?.toLowerCase() ?? (/\$\s*\(?0{3}s?\)?|\$000s?/i.test(input) ? 'thousands' : null)
+  const thousandsNotation = /\$\s*['’]?\s*\(?0{3}s?\)?/i
+  const match = input.match(/(?:in|amounts? in|\$\s*in)\s+(?:(?:usd|eur|gbp|u\.s\. dollars?)\s+)?(thousands|millions|billions)|\b(?:usd|eur|gbp)\s+(thousands|millions|billions)|\$\s*['’]?\s*\(?0{3}s?\)?/i)
+  const scaleLabel = (match?.[1] ?? match?.[2])?.toLowerCase() ?? (thousandsNotation.test(input) ? 'thousands' : null)
   const scale = scaleLabel === 'thousands' ? 1_000
     : scaleLabel === 'millions' ? 1_000_000
       : scaleLabel === 'billions' ? 1_000_000_000
@@ -198,15 +199,28 @@ function fiscalQuarterRange(year, quarter, fye) {
 }
 
 function parseDateHeader(value) {
-  const match = normalizedCellText(value).match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(20\d{2})\b/i)
-  if (!match) return null
-  const month = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'].indexOf(match[1].toLowerCase()) + 1
-  return isoDate(Number(match[3]), month, Number(match[2]))
+  const input = normalizedCellText(value)
+  const monthNames = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec'
+  const monthFirst = input.match(new RegExp(`\\b(${monthNames})\\s+(\\d{1,2}),?\\s+(20\\d{2})\\b`, 'i'))
+  const dayFirst = input.match(new RegExp(`\\b(\\d{1,2})\\s+(${monthNames})\\s+(20\\d{2})\\b`, 'i'))
+  const monthLabel = monthFirst?.[1] ?? dayFirst?.[2]
+  const day = monthFirst?.[2] ?? dayFirst?.[1]
+  const year = monthFirst?.[3] ?? dayFirst?.[3]
+  if (!monthLabel || !day || !year) return null
+  const month = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+    .indexOf(monthLabel.toLowerCase().slice(0, 3)) + 1
+  return month > 0 ? isoDate(Number(year), month, Number(day)) : null
 }
 
 function contextualPeriodEnd(context, year, reportDate = null) {
-  const matches = [...normalizedCellText(context).matchAll(/\b(?:(?:three|six|nine|twelve) months|year) ended\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})/gi)]
-  const candidates = [...new Set(matches.map((match) => parseDateHeader(`${match[1]} ${match[2]}, ${year}`)).filter(Boolean))]
+  const input = normalizedCellText(context)
+  const monthNames = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec'
+  const prefix = '(?:(?:three|six|nine|twelve) months|years?) ended'
+  const monthFirst = [...input.matchAll(new RegExp(`\\b${prefix}\\s+(${monthNames})\\s+(\\d{1,2})`, 'gi'))]
+    .map((match) => `${match[1]} ${match[2]}, ${year}`)
+  const dayFirst = [...input.matchAll(new RegExp(`\\b${prefix}\\s+(\\d{1,2})\\s+(${monthNames})`, 'gi'))]
+    .map((match) => `${match[1]} ${match[2]} ${year}`)
+  const candidates = [...new Set([...monthFirst, ...dayFirst].map(parseDateHeader).filter(Boolean))]
   if (!candidates.length) return null
   const reportMonthDay = /^\d{4}-(\d{2}-\d{2})$/.exec(String(reportDate ?? ''))?.[1] ?? null
   if (reportMonthDay) {
@@ -289,7 +303,7 @@ function periodFromHeaders(headers, company, filing, context = '') {
     : /six months ended/i.test(context) ? { type: 'YTD_6M', months: 6 }
       : /nine months ended/i.test(context) ? { type: 'YTD_9M', months: 9 }
         : /(?:\bltm|trailing twelve months) ended/i.test(context) ? { type: 'LTM', months: 12 }
-          : /(?:twelve months|year) ended/i.test(context) ? { type: 'FISCAL_YEAR', months: 12 }
+      : /(?:twelve months|years?) ended/i.test(context) ? { type: 'FISCAL_YEAR', months: 12 }
           : null
   if (contextualDuration) {
     const contextualEnd = contextualPeriodEnd(context, year, filing.reportDate)
@@ -1029,6 +1043,23 @@ export async function loadSupplementalFilingFacts({ company, filingIndex, years,
     records,
     errors,
     filingsExamined: candidates.length,
+    sourceSearchEvidence: {
+      completed,
+      failed: errors.length > 0,
+      timedOut: false,
+      requestedYears: [...years],
+      candidateCount: candidates.length,
+      sourcesExamined: completedFilings.map((filing) => ({
+        sourceId: `SEC:${String(company?.cik ?? '').padStart(10, '0')}:${filing.accessionNumber}`,
+        accessionNumber: filing.accessionNumber,
+        form: filing.form,
+        filingDate: filing.filingDate,
+        reportDate: filing.reportDate,
+        filingUrl: filing.filingUrl,
+        extractionCompleted: filing.extractionCompleted,
+      })),
+      extractionErrors: errors,
+    },
     negativeSearchEvidence: {
       searchType: 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA',
       completed,

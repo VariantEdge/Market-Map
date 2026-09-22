@@ -428,10 +428,10 @@ function additiveCapexClass(candidate) {
   if (broadReportedCapexCandidate(candidate)) return null
   const text = `${candidate.concept ?? ''} ${candidate.label ?? ''}`.toLowerCase().replace(/[^a-z0-9]+/g, ' ')
   if (/\bproperty\s+plant\s+(?:and\s+)?equipment\b|\bproperty\s+and\s+equipment\b/.test(text) &&
-      /\b(?:net\s+of|excluding|exclusive\s+of)\s+(?:purchases?\s+of\s+)?computer\s+hardware\b/.test(text)) {
+      /\b(?:net\s+of|excluding|exclusive\s+of)\s+(?:purchases?\s+of\s+)?(?:(?:computer|mining)\s+)?hardware(?:\s+prepayments?)?\b/.test(text)) {
     return 'PROPERTY_PLANT_EQUIPMENT'
   }
-  if (/\bcomputer\s+hardware\b/.test(text)) return 'COMPUTER_HARDWARE'
+  if (/\b(?:(?:computer|mining)\s+hardware|hardware\s+prepayments?)\b/.test(text)) return 'COMPUTER_HARDWARE'
   return null
 }
 
@@ -471,26 +471,45 @@ function capexDerivationInput(candidate) {
 
 function additiveCapexCandidate(candidates) {
   if (candidates.length < 2) return null
-  const authority = dateAuthorityRank(candidates[0])
-  const eligible = candidates.filter((candidate) => dateAuthorityRank(candidate) === authority)
+  const maximumAuthoritativeRank = dateAuthorityRank({
+    dateAuthority: DATE_AUTHORITY.DERIVED_FROM_REPORTED_BOUNDARIES,
+  })
+  const eligible = candidates.filter((candidate) => dateAuthorityRank(candidate) <= maximumAuthoritativeRank)
   const classified = eligible.map((candidate) => ({ candidate, componentClass: additiveCapexClass(candidate) }))
-    .filter((item) => item.componentClass)
-  if (classified.length < 2 || classified.some(({ candidate }) =>
-    candidate.explicitPeriodMapping !== true || !candidate.sourceId || !candidate.accession)) return null
-  const componentAccessions = new Set(classified.map(({ candidate }) => candidate.accession))
-  if (componentAccessions.size !== 1) return null
-  const byComponentClass = new Map()
+    .filter(({ candidate, componentClass }) => componentClass && candidate.explicitPeriodMapping === true &&
+      candidate.sourceId && candidate.accession)
+  if (classified.length < 2) return null
+  const byAccession = new Map()
   for (const item of classified) {
-    if (!byComponentClass.has(item.componentClass)) byComponentClass.set(item.componentClass, [])
-    byComponentClass.get(item.componentClass).push(item.candidate)
+    if (!byAccession.has(item.candidate.accession)) byAccession.set(item.candidate.accession, [])
+    byAccession.get(item.candidate.accession).push(item)
   }
-  if (byComponentClass.size !== 2 || [...byComponentClass.values()].some((group) =>
-    group.some((candidate) => !valuesAgree(candidate.normalizedValue, group[0].normalizedValue)))) return null
-  const components = [...byComponentClass.values()].map((group) => group[0])
+  const componentClasses = ['PROPERTY_PLANT_EQUIPMENT', 'COMPUTER_HARDWARE']
+  const completeGroups = [...byAccession.entries()].map(([accession, items]) => {
+    const byComponentClass = new Map()
+    for (const item of items) {
+      if (!byComponentClass.has(item.componentClass)) byComponentClass.set(item.componentClass, [])
+      byComponentClass.get(item.componentClass).push(item.candidate)
+    }
+    if (componentClasses.some((componentClass) => !byComponentClass.has(componentClass)) ||
+        [...byComponentClass.values()].some((group) =>
+          group.some((candidate) => !valuesAgree(candidate.normalizedValue, group[0].normalizedValue)))) return null
+    const components = componentClasses.map((componentClass) => [...byComponentClass.get(componentClass)]
+      .sort((left, right) => dateAuthorityRank(left) - dateAuthorityRank(right) ||
+        String(right.filingDate ?? '').localeCompare(String(left.filingDate ?? '')) ||
+        String(left.sourceId).localeCompare(String(right.sourceId)))[0])
+    return { accession, components, items }
+  }).filter(Boolean).sort((left, right) =>
+    String(right.components[0].filingDate ?? '').localeCompare(String(left.components[0].filingDate ?? '')) ||
+    String(right.accession).localeCompare(String(left.accession)))
+  if (!completeGroups.length) return null
+  const [{ components }] = completeGroups
   if (new Set(components.map((candidate) => candidate.sourceId)).size !== components.length) return null
   const first = components[0]
   const additiveValue = components.reduce((total, item) => total + Number(item.normalizedValue), 0)
   const otherPlausibleCandidates = eligible.filter((candidate) => !additiveCapexClass(candidate))
+  const alternatives = eligible.filter((candidate) => !components.some((component) =>
+    component.sourceId === candidate.sourceId))
   const componentCorroborations = otherPlausibleCandidates.filter((candidate) =>
     !broadReportedCapexCandidate(candidate) &&
     components.some((componentCandidate) =>
@@ -508,7 +527,7 @@ function additiveCapexCandidate(candidates) {
     concept: 'AdditiveNonOverlappingCashCapexComponents',
     label: 'Additive non-overlapping cash capex components',
     sourceId: components.map((item) => item.sourceId).sort().join('|PLUS|'),
-    alternatives: otherPlausibleCandidates,
+    alternatives,
     conflicts: conflictingCandidates,
     conflictReason: conflictingCandidates.length ? 'SOURCE_VALUE_CONFLICT' : null,
     restatedOrRecast: components.some((item) => item.restatedOrRecast),
@@ -516,7 +535,7 @@ function additiveCapexCandidate(candidates) {
     derivation: {
       method: 'ADDITIVE_NON_OVERLAPPING_CASH_CAPEX_COMPONENTS',
       exactness: 'EXACT_ARITHMETIC',
-      componentClasses: [...byComponentClass.keys()],
+      componentClasses,
       inputs: components.map(capexDerivationInput),
       reconciliation: otherPlausibleCandidates.length ? {
         method: 'ADDITIVE_SUM_VS_ALL_PLAUSIBLE_CAPEX_CANDIDATES',
@@ -1194,6 +1213,7 @@ export function buildSecEnrichedFinancialsShadow({
   years,
   asOfDate = '9999-12-31',
   retrievedAt = null,
+  sourceSearchEvidence = null,
 } = {}) {
   const wise = adaptWiseSheetsObservations(wiseSheetsRows, { providerFrequency: 'QUARTERLY', retrievedAt })
   const sec = adaptSecCanonicalFinancials({ company, facts, filings, supplementalFacts, retrievedAt, asOfDate })
@@ -1225,7 +1245,17 @@ export function buildSecEnrichedFinancialsShadow({
     .sort((left, right) => left.periodEnd.localeCompare(right.periodEnd))[0] ?? createLatestReportedPeriod({})
 
   const calendarActuals = Object.fromEntries(SEC_CANONICAL_METRICS.map((metric) => [metric,
-    Object.fromEntries(years.map((year) => [year, buildCalendarYear(records[metric], year)])),
+    Object.fromEntries(years.map((year) => [year, buildCalendarYear(records[metric], year, {
+      sourceSearchCompleteness: sourceSearchEvidence?.completed === true &&
+        sourceSearchEvidence?.failed !== true && sourceSearchEvidence?.timedOut !== true
+        ? {
+            ...sourceSearchEvidence,
+            metric,
+            targetStart: `${year}-01-01`,
+            targetEnd: `${year}-12-31`,
+          }
+        : null,
+    })])),
   ]))
   const ltm = Object.fromEntries(SEC_CANONICAL_METRICS.map((metric) => [metric,
     buildLtm(records[metric], { asOfDate, latestReportedPeriod: latestReportedPeriods[metric] }),
@@ -1450,6 +1480,7 @@ export async function buildCanonicalHistoricalFinancials({
   years,
   supplementalFacts,
   additionalSupplementalFacts = [],
+  sourceSearchEvidence = null,
   asOfDate = '9999-12-31',
   retrievedAt = new Date().toISOString(),
   fetchSecText,
@@ -1461,7 +1492,7 @@ export async function buildCanonicalHistoricalFinancials({
 }) {
   const initialCanonical = buildSecEnrichedFinancialsShadow({
     ticker, wiseSheetsRows, company, facts, filings, years,
-    supplementalFacts: [], asOfDate, retrievedAt,
+    supplementalFacts: [], asOfDate, retrievedAt, sourceSearchEvidence,
   })
   const requiredPeriods = requiredSecCompletionPeriods(initialCanonical, years)
   const loadTargeted = async (periods) => {
@@ -1481,7 +1512,7 @@ export async function buildCanonicalHistoricalFinancials({
   let supplementalRecords = [...targeted.records, ...additionalSupplementalFacts]
   let canonical = buildSecEnrichedFinancialsShadow({
     ticker, wiseSheetsRows, company, facts, filings, years,
-    supplementalFacts: supplementalRecords, asOfDate, retrievedAt,
+    supplementalFacts: supplementalRecords, asOfDate, retrievedAt, sourceSearchEvidence,
   })
   canonical.failures.push(...targeted.failures)
   if (!supplementalFacts) {
@@ -1494,7 +1525,7 @@ export async function buildCanonicalHistoricalFinancials({
         .map((record) => [record.id, record])).values()]
       canonical = buildSecEnrichedFinancialsShadow({
         ticker, wiseSheetsRows, company, facts, filings, years,
-        supplementalFacts: supplementalRecords, asOfDate, retrievedAt,
+        supplementalFacts: supplementalRecords, asOfDate, retrievedAt, sourceSearchEvidence,
       })
       canonical.failures.push(...targeted.failures, ...followUp.failures)
       targeted.filings = [...new Map([...targeted.filings, ...followUp.filings]

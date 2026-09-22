@@ -173,14 +173,22 @@ function exactDerivedCalendarYearCandidate(observation, year) {
       .includes(input.periodIdentity?.dateAuthority) && input.deduplicationStatus !== 'REQUIRES_REVIEW')
 }
 
-function exactCalendarUnavailableEvidence(observations, year, coverage) {
+function exactCalendarUnavailableEvidence(observations, year, coverage, completedSearch = null) {
   const calendar = calendarRange(year)
   const metric = observations.find((item) => item.metric)?.metric ?? null
-  const sourceSearchCompleteness = observations.map((item) => item.sourceSearchCompleteness).find((evidence) =>
+  const candidateSearchCompleteness = completedSearch ?? observations.map((item) => item.sourceSearchCompleteness).find((evidence) =>
     evidence?.completed === true && evidence?.failed !== true && evidence?.timedOut !== true &&
     evidence.metric === metric && evidence.targetStart === calendar.start && evidence.targetEnd === calendar.end &&
     (evidence.sourcesExamined ?? []).length > 0 && evidence.sourcesExamined.every((source) =>
       source.sourceId && source.extractionCompleted === true))
+  const sourceSearchCompleteness = candidateSearchCompleteness?.completed === true &&
+    candidateSearchCompleteness?.failed !== true && candidateSearchCompleteness?.timedOut !== true &&
+    candidateSearchCompleteness.metric === metric && candidateSearchCompleteness.targetStart === calendar.start &&
+    candidateSearchCompleteness.targetEnd === calendar.end &&
+    (candidateSearchCompleteness.sourcesExamined ?? []).length > 0 &&
+    candidateSearchCompleteness.sourcesExamined.every((source) => source.sourceId && source.extractionCompleted === true)
+    ? candidateSearchCompleteness
+    : null
   if (!sourceSearchCompleteness) return null
   const authoritative = observations.filter((item) => hasAuthoritativeBoundaries(item.periodIdentity) &&
     item.deduplicationStatus !== 'REQUIRES_REVIEW' && item.sourceId)
@@ -269,7 +277,7 @@ function exactCalendarBridgeResult(observations, year) {
   return failures[0] ?? null
 }
 
-export function buildCalendarYear(observations = [], year) {
+export function buildCalendarYear(observations = [], year, { sourceSearchCompleteness = null } = {}) {
   const normalizedYear = Number(year)
   const deduped = deduplicateEconomicPeriods(observations)
   if (!deduped.length) return unavailable(HISTORICAL_RESULT_STATUS.MISSING_SOURCE_DATA, 'NO_OBSERVATIONS')
@@ -323,7 +331,7 @@ export function buildCalendarYear(observations = [], year) {
   const coverage = coverageAnalysis(quarters, normalizedYear)
   if (coverage.overlaps.length) return unavailable(HISTORICAL_RESULT_STATUS.REQUIRES_REVIEW, 'OVERLAPPING_PERIOD_COVERAGE', { coverage })
   if (!coverage.complete) {
-    const nullEvidence = exactCalendarUnavailableEvidence(deduped, normalizedYear, coverage)
+    const nullEvidence = exactCalendarUnavailableEvidence(deduped, normalizedYear, coverage, sourceSearchCompleteness)
     if (nullEvidence) {
       return unavailable(HISTORICAL_RESULT_STATUS.LEGITIMATE_NA,
         'EXACT_CALENDAR_YEAR_NOT_REPORTED_OR_EXACTLY_DERIVABLE', {

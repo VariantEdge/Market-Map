@@ -918,6 +918,70 @@ test('distinct same-filing cash capex components are summed only when labels pro
   assert.equal(fcf.derivation.inputs[1].normalizedValue, 4_333_087_000)
 })
 
+test('reported standard PP&E corroboration does not preempt explicitly mapped additive capex components', () => {
+  const accessionNumber = 'mixed-authority-capex-components'
+  const common = {
+    units: 'USD', currency: 'USD', startDate: '2023-07-01', endDate: '2023-12-31',
+    periodType: 'SEMI_ANNUAL', fiscalPeriod: 'H2', fiscalYear: 2024,
+    filingForm: '6-K', filingDate: '2024-02-15', accessionNumber,
+    filingUrl: 'https://www.sec.gov/mixed-authority-capex-components.htm',
+    explicitPeriodMapping: true, metricCandidates: ['capitalExpenditures'], namespace: 'iren',
+  }
+  const result = adaptSecCanonicalFinancials({
+    company, facts: { cik: company.cik, facts: {} },
+    supplementalFacts: [
+      { ...common, id: 'standard-ppe', namespace: 'ifrs-full', concept: 'PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities',
+        label: 'Purchase of property, plant and equipment', value: -100,
+        dateAuthority: DATE_AUTHORITY.REPORTED },
+      { ...common, id: 'ppe-net', concept: 'PaymentsToAcquirePropertyPlantAndEquipmentNetOfComputerHardware',
+        label: 'Payments for property, plant and equipment, net of computer hardware', value: -100,
+        dateAuthority: DATE_AUTHORITY.DERIVED_FROM_REPORTED_BOUNDARIES },
+      { ...common, id: 'hardware', concept: 'PurchasesOfComputerHardware',
+        label: 'Purchases of computer hardware', value: -40,
+        dateAuthority: DATE_AUTHORITY.DERIVED_FROM_REPORTED_BOUNDARIES },
+    ],
+    metrics: ['capitalExpenditures'],
+  })
+  const capex = result.observations[0]
+  assert.equal(capex.normalizedValue, 140)
+  assert.equal(capex.reportedVsDerived, 'DERIVED')
+  assert.notEqual(capex.deduplicationStatus, 'REQUIRES_REVIEW')
+  assert.equal(capex.derivation.method, 'ADDITIVE_NON_OVERLAPPING_CASH_CAPEX_COMPONENTS')
+  assert.equal(capex.derivation.reconciliation.componentCorroborations[0].sourceId, 'standard-ppe')
+})
+
+test('hardware-prepayment wording proves non-overlap even when the reported hardware component is zero', () => {
+  const accessionNumber = 'zero-hardware-prepayment-capex'
+  const common = {
+    units: 'USD', currency: 'USD', startDate: '2022-07-01', endDate: '2023-06-30',
+    periodType: 'FISCAL_YEAR', fiscalPeriod: 'FY', fiscalYear: 2023,
+    filingForm: '10-K', filingDate: '2025-08-28', accessionNumber,
+    filingUrl: 'https://www.sec.gov/zero-hardware-prepayment-capex.htm',
+    explicitPeriodMapping: true, metricCandidates: ['capitalExpenditures'], namespace: 'iren',
+  }
+  const result = adaptSecCanonicalFinancials({
+    company, facts: { cik: company.cik, facts: {} },
+    supplementalFacts: [
+      { ...common, id: 'standard-ppe', namespace: 'us-gaap', concept: 'PaymentsToAcquirePropertyPlantAndEquipment',
+        label: 'Payments to acquire property, plant and equipment', value: -116_064_000,
+        dateAuthority: DATE_AUTHORITY.REPORTED },
+      { ...common, id: 'ppe-net', concept: 'PaymentsForPropertyPlantAndEquipmentNetOfHardwarePrepayments',
+        label: 'Payments for property, plant and equipment net of hardware prepayments', value: -116_064_000,
+        dateAuthority: DATE_AUTHORITY.DERIVED_FROM_REPORTED_BOUNDARIES },
+      { ...common, id: 'hardware', concept: 'PaymentsRelatedToComputerHardwarePrepayments',
+        label: 'Payments related to computer hardware prepayments', value: 0,
+        dateAuthority: DATE_AUTHORITY.REPORTED },
+    ],
+    metrics: ['capitalExpenditures'],
+  })
+  const capex = result.observations[0]
+  assert.equal(capex.normalizedValue, 116_064_000)
+  assert.equal(capex.reportedVsDerived, 'DERIVED')
+  assert.notEqual(capex.deduplicationStatus, 'REQUIRES_REVIEW')
+  assert.deepEqual(capex.derivation.inputs.map((input) => input.normalizedValue), [116_064_000, 0])
+  assert.equal(capex.derivation.reconciliation.componentCorroborations[0].sourceId, 'standard-ppe')
+})
+
 test('additive capex fails closed when a reported total materially disagrees', () => {
   const accessionNumber = 'capex-total-conflict'
   const common = {
@@ -1090,6 +1154,53 @@ test('structured cash-flow extraction recognizes a separate computer-hardware ca
     company: { ...company, fiscalYearEnd: '0630' }, filing, html,
   }).filter((item) => item.metricCandidates.includes('capitalExpenditures'))
   assert.deepEqual(supplementalFacts.map((item) => item.value), [-2_998_006_000, -1_335_081_000])
+})
+
+test("structured cash-flow extraction recognizes foreign-issuer $'000 units and plural years-ended headers", () => {
+  const filing = {
+    id: 'foreign-capex', immutableSourceId: 'SEC:fixture:foreign-capex', form: '20-F',
+    accessionNumber: 'foreign-capex', filingDate: '2026-08-27', reportDate: '2026-06-30',
+    filingUrl: 'https://www.sec.gov/foreign-capex.htm',
+  }
+  const html = `<p>Consolidated statements of cash flows</p><p>For the years ended June 30, 2026, 2025, and 2024</p>
+    <table><tr><th>Metric</th><th>2026</th><th>2025</th><th>2024</th></tr>
+    <tr><th></th><th>$'000</th><th>$'000</th><th>$'000</th></tr>
+    <tr><td>Payments for property, plant and equipment, net of computer hardware</td>
+      <td>(2,998,006)</td><td>(573,456)</td><td>(141,855)</td></tr>
+    <tr><td>Payments for computer hardware</td><td>(1,335,081)</td><td>(799,171)</td><td>(338,054)</td></tr>
+    </table>`
+  const rows = extractStructuredFinancialTableFacts({
+    company: { ...company, fiscalYearEnd: '0630' }, filing, html,
+  }).filter((item) => item.metricCandidates.includes('capitalExpenditures'))
+  assert.equal(rows.length, 6)
+  assert.ok(rows.every((item) => item.explicitPeriodMapping === true))
+  assert.ok(rows.every((item) => item.dateAuthority === DATE_AUTHORITY.DERIVED_FROM_REPORTED_BOUNDARIES))
+  assert.deepEqual(rows.filter((item) => item.endDate === '2025-06-30').map((item) => item.value),
+    [-573_456_000, -799_171_000])
+})
+
+test("structured cash-flow extraction recognizes day-first foreign-issuer half-year headers", () => {
+  const filing = {
+    id: 'foreign-half-capex', immutableSourceId: 'SEC:fixture:foreign-half-capex', form: '6-K',
+    accessionNumber: 'foreign-half-capex', filingDate: '2024-02-15', reportDate: '2023-12-31',
+    filingUrl: 'https://www.sec.gov/foreign-half-capex.htm',
+  }
+  const html = `<table><tr><th>Metric</th><th>Six months ended 31 Dec 2023</th><th>Six months ended 31 Dec 2022</th></tr>
+    <tr><th></th><th>$'000</th><th>$'000</th></tr>
+    <tr><td>Payments for property, plant and equipment net of computer hardware prepayments</td>
+      <td>(31,389)</td><td>(54,653)</td></tr>
+    <tr><td>Payments for computer hardware prepayments</td><td>(32,626)</td><td>(10,003)</td></tr>
+    </table>`
+  const rows = extractStructuredFinancialTableFacts({
+    company: { ...company, fiscalYearEnd: '0630' }, filing, html,
+  }).filter((item) => item.metricCandidates.includes('capitalExpenditures'))
+  assert.deepEqual(rows.map((item) => [item.startDate, item.endDate, item.value]), [
+    ['2023-07-01', '2023-12-31', -31_389_000],
+    ['2022-07-01', '2022-12-31', -54_653_000],
+    ['2023-07-01', '2023-12-31', -32_626_000],
+    ['2022-07-01', '2022-12-31', -10_003_000],
+  ])
+  assert.ok(rows.every((item) => item.explicitPeriodMapping === true))
 })
 
 test('ambiguous capex concepts remain a conflict and are never blindly summed', () => {

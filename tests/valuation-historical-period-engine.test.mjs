@@ -198,6 +198,49 @@ test('non-calendar annual plus partial periods is unresolved without complete so
   assert.equal(result.nullEvidence, undefined)
 })
 
+test('complete primary-source filing search proves an exact calendar coverage gap without estimating', () => {
+  const records = [
+    observation({ ticker: 'AUGCO', metric: 'capitalExpenditures', type: PERIOD_TYPE.FISCAL_YEAR,
+      start: '2023-09-01', end: '2024-08-31', value: 100, fiscalYear: 2024 }),
+    observation({ ticker: 'AUGCO', metric: 'capitalExpenditures', type: PERIOD_TYPE.STANDALONE_QUARTER,
+      start: '2024-03-01', end: '2024-05-31', value: 20, fiscalYear: 2024, fiscalQuarter: 3 }),
+  ]
+  const sourceSearchCompleteness = {
+    completed: true,
+    failed: false,
+    timedOut: false,
+    metric: 'capitalExpenditures',
+    targetStart: '2024-01-01',
+    targetEnd: '2024-12-31',
+    sourcesExamined: [{ sourceId: 'SEC:AUGCO:10-K-2024', extractionCompleted: true }],
+  }
+  const result = buildCalendarYear(records, 2024, { sourceSearchCompleteness })
+  assert.equal(result.value, null)
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.LEGITIMATE_NA)
+  assert.equal(result.reason, 'EXACT_CALENDAR_YEAR_NOT_REPORTED_OR_EXACTLY_DERIVABLE')
+  assert.equal(result.nullEvidence.sourceSearchCompleteness, sourceSearchCompleteness)
+})
+
+test('failed primary-source filing search cannot prove an exact calendar coverage gap', () => {
+  const records = [
+    observation({ ticker: 'AUGCO', metric: 'capitalExpenditures', type: PERIOD_TYPE.FISCAL_YEAR,
+      start: '2023-09-01', end: '2024-08-31', value: 100, fiscalYear: 2024 }),
+    observation({ ticker: 'AUGCO', metric: 'capitalExpenditures', type: PERIOD_TYPE.STANDALONE_QUARTER,
+      start: '2024-03-01', end: '2024-05-31', value: 20, fiscalYear: 2024, fiscalQuarter: 3 }),
+  ]
+  const result = buildCalendarYear(records, 2024, { sourceSearchCompleteness: {
+    completed: false,
+    failed: true,
+    timedOut: false,
+    metric: 'capitalExpenditures',
+    targetStart: '2024-01-01',
+    targetEnd: '2024-12-31',
+    sourcesExamined: [{ sourceId: 'SEC:AUGCO:10-K-2024', extractionCompleted: false }],
+  } })
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE)
+  assert.equal(result.nullEvidence, undefined)
+})
+
 test('failed exact-calendar bridge does not preempt four valid exact calendar quarters', () => {
   const bridge = [
     observation({ ticker: 'BRIDGE', metric: 'revenue', type: PERIOD_TYPE.FISCAL_YEAR,

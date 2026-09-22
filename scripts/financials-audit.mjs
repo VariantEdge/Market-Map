@@ -260,6 +260,7 @@ for (const [tickerIndex, ticker] of requestedTickers.entries()) {
       filings: filingIndex,
       years,
       additionalSupplementalFacts: supplemental.records,
+      sourceSearchEvidence: supplemental.sourceSearchEvidence,
     })
     const canonical = production.canonical
     const expectedLtmEnd = latestReportedQuarterEnd(filingIndex, ledger.rawLedger)
