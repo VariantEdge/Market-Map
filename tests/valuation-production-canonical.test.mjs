@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildMarginBasedForwardSeries,
+  buildValuationRow,
   canonicalHistoricalForApi,
   loadAdjustedEbitdaProductionTask,
   loadLegacyForwardBasisProductionTask,
@@ -125,6 +126,57 @@ test('production canonical builder returns the same approved canonical result wi
   assert.equal(production.canonical.calendarActuals.revenue[2024].value, 100)
   assert.equal(production.canonical.calendarActuals.grossProfit[2024].value, 40)
   assert.equal('comparisons' in production, false)
+})
+
+test('production row builder passes complete search evidence and supplemental facts to canonical valuation', async () => {
+  const accessionNumber = 'synthetic-production-filing'
+  const sourceSearchEvidence = {
+    completed: false,
+    failed: false,
+    timedOut: false,
+    metricYearEvidence: Object.fromEntries(
+      ['revenue', 'grossProfit', 'ebit', 'operatingCashFlow', 'capitalExpenditures', 'freeCashFlow']
+        .map((metric) => [metric, { 2024: {
+          completed: true, failed: false, timedOut: false, metric,
+          targetStart: '2024-01-01', targetEnd: '2024-12-31',
+          source: 'SEC_COMPANY_SUBMISSIONS_PLUS_COMPANYFACTS', sourceInventoryComplete: true,
+          companyFactsRetrieved: true, relevantFilingCount: 1, selectedRelevantFilingCount: 1,
+          relevantAccessions: [accessionNumber], excludedRelevantAccessions: [],
+          conceptFamiliesExamined: ['SEC_COMPANY_FACTS', 'SEC_INLINE_XBRL'],
+          conceptsExamined: ['Revenue'],
+          sourcesExamined: [{ sourceId: `SEC:${accessionNumber}`, accessionNumber, extractionCompleted: true }],
+        } }])),
+  }
+  const filingIndex = {
+    company,
+    filings: [{ accessionNumber, form: '10-K', reportDate: '2024-12-31', filingDate: '2025-02-01',
+      filingUrl: 'https://www.sec.gov/synthetic-production-filing.htm' }],
+    inventoryEvidence: { source: 'SEC_COMPANY_SUBMISSIONS', complete: true },
+  }
+  let canonicalInput
+  const row = await buildValuationRow({}, 'PARITY', { actual: [2024], estimate: [2025] }, [], {
+    refreshCanonical: true,
+    auditedFinancialsLoader: async () => null,
+    priceLoader: async () => ({ price: 10, currency: 'USD' }),
+    fundamentalsLoader: async () => ({ currency: 'USD', estimates: {} }),
+    companyResolver: async () => ({ ...company, ticker: 'PARITY' }),
+    chartLoader: async () => ({ points: [] }),
+    filingIndexLoader: async () => filingIndex,
+    companyFactsLoader: async () => companyFacts(),
+    supplementalDependencies: {
+      loadCached: async () => { throw new Error('complete search must bypass partial cache') },
+      loadSupplemental: async () => ({ records: [{ id: 'supplemental-proof' }], errors: [],
+        sourceSearchEvidence, filingsExamined: 1 }),
+    },
+    canonicalHistoricalBuilder: async (input) => {
+      canonicalInput = input
+      return buildCanonicalHistoricalFinancials(input)
+    },
+  })
+  assert.equal(canonicalInput.sourceSearchEvidence, sourceSearchEvidence)
+  assert.equal(canonicalInput.additionalSupplementalFacts[0].id, 'supplemental-proof')
+  assert.equal(row.ticker, 'PARITY')
+  assert.equal(row.provenance.revenue['2024A'].value, 100)
 })
 
 test('targeted SEC completion times out without hanging or substituting legacy GAAP values', async () => {

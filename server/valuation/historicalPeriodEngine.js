@@ -177,16 +177,22 @@ function exactCalendarUnavailableEvidence(observations, year, coverage, complete
   const calendar = calendarRange(year)
   const metric = observations.find((item) => item.metric)?.metric ?? null
   const candidateSearchCompleteness = completedSearch ?? observations.map((item) => item.sourceSearchCompleteness).find((evidence) =>
-    evidence?.completed === true && evidence?.failed !== true && evidence?.timedOut !== true &&
-    evidence.metric === metric && evidence.targetStart === calendar.start && evidence.targetEnd === calendar.end &&
-    (evidence.sourcesExamined ?? []).length > 0 && evidence.sourcesExamined.every((source) =>
-      source.sourceId && source.extractionCompleted === true))
+    evidence?.completed === true && evidence.metric === metric && evidence.targetStart === calendar.start && evidence.targetEnd === calendar.end)
+  const sources = candidateSearchCompleteness?.sourcesExamined ?? []
+  const accessions = candidateSearchCompleteness?.relevantAccessions ?? []
   const sourceSearchCompleteness = candidateSearchCompleteness?.completed === true &&
-    candidateSearchCompleteness?.failed !== true && candidateSearchCompleteness?.timedOut !== true &&
+    candidateSearchCompleteness?.failed === false && candidateSearchCompleteness?.timedOut === false &&
     candidateSearchCompleteness.metric === metric && candidateSearchCompleteness.targetStart === calendar.start &&
     candidateSearchCompleteness.targetEnd === calendar.end &&
-    (candidateSearchCompleteness.sourcesExamined ?? []).length > 0 &&
-    candidateSearchCompleteness.sourcesExamined.every((source) => source.sourceId && source.extractionCompleted === true)
+    candidateSearchCompleteness.source === 'SEC_COMPANY_SUBMISSIONS_PLUS_COMPANYFACTS' &&
+    candidateSearchCompleteness.sourceInventoryComplete === true && candidateSearchCompleteness.companyFactsRetrieved === true &&
+    candidateSearchCompleteness.relevantFilingCount === accessions.length &&
+    candidateSearchCompleteness.selectedRelevantFilingCount === accessions.length &&
+    (candidateSearchCompleteness.excludedRelevantAccessions ?? []).length === 0 &&
+    (candidateSearchCompleteness.conceptFamiliesExamined ?? []).includes('SEC_COMPANY_FACTS') &&
+    (candidateSearchCompleteness.conceptsExamined ?? []).length > 0 &&
+    sources.length === accessions.length && sources.length > 0 &&
+    sources.every((source) => source.sourceId && source.accessionNumber && source.extractionCompleted === true)
     ? candidateSearchCompleteness
     : null
   if (!sourceSearchCompleteness) return null

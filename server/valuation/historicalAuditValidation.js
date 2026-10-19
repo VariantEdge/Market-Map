@@ -72,8 +72,15 @@ function hasCompletedExactCalendarSearchEvidence(record, evidence) {
   if (search.metric !== record.metric || search.targetStart !== `${expectedYear}-01-01` ||
       search.targetEnd !== `${expectedYear}-12-31`) return false
   const sources = search.sourcesExamined ?? []
-  return sources.length > 0 && sources.every((source) =>
-    source.sourceId && source.extractionCompleted === true)
+  const accessions = search.relevantAccessions ?? []
+  return search.source === 'SEC_COMPANY_SUBMISSIONS_PLUS_COMPANYFACTS' &&
+    search.sourceInventoryComplete === true && search.companyFactsRetrieved === true &&
+    search.completed === true && search.failed === false && search.timedOut === false &&
+    search.relevantFilingCount === accessions.length && search.selectedRelevantFilingCount === accessions.length &&
+    (search.excludedRelevantAccessions ?? []).length === 0 && sources.length === accessions.length &&
+    (search.conceptFamiliesExamined ?? []).includes('SEC_COMPANY_FACTS') &&
+    (search.conceptsExamined ?? []).length > 0 && sources.length > 0 && sources.every((source) =>
+      source.sourceId && source.accessionNumber && source.extractionCompleted === true)
 }
 
 function hasCompletedCompanyMetricInventoryEvidence(record) {

@@ -168,6 +168,24 @@ test('explicit Adjusted EBITDA refresh bypasses stale supplemental cache exactly
   assert.equal(result.records[0].sourceId, 'fresh')
 })
 
+test('complete source search bypasses partial supplemental cache and records CompanyFacts retrieval', async () => {
+  let cacheReads = 0
+  let loaderInput
+  const result = await loadSupplementalProductionTask({
+    company: { ticker: 'SYNTH', cik: '1' }, filingIndex: { filings: [] }, years: [2025],
+    skipSupplemental: false, requireCompleteInventory: true, companyFactsRetrieved: true,
+  }, {
+    loadCached: async () => { cacheReads += 1; return { records: [{ id: 'partial-cache' }], errors: [] } },
+    loadSupplemental: async (input) => {
+      loaderInput = input
+      return { records: [{ id: 'fresh-complete-search' }], errors: [], sourceSearchEvidence: { completed: true } }
+    },
+  })
+  assert.equal(cacheReads, 0)
+  assert.equal(loaderInput.companyFactsRetrieved, true)
+  assert.equal(result.records[0].id, 'fresh-complete-search')
+})
+
 test('complete audited Adjusted EBITDA coverage is the only valid supplemental skip condition', () => {
   assert.equal(hasCompleteAuditedAdjustedEbitda(audit({ 2023: 1, 2024: 2, 2025: 3 }, 4), years.actual), true)
   assert.equal(hasCompleteAuditedAdjustedEbitda(audit({ 2023: 1, 2024: 2, 2025: 3 }), years.actual), false)

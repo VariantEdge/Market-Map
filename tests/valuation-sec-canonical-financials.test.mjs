@@ -1086,6 +1086,72 @@ test('unclassified PP&E disagreeing with components and additive sum fails close
   assert.equal(capex.derivation.reconciliation.conflictingCandidates[0].sourceId, 'standard-ppe')
 })
 
+test('complete additive Capex groups from competing filings must reconcile or fail closed', () => {
+  const common = {
+    units: 'USD', currency: 'USD', startDate: '2025-01-01', endDate: '2025-12-31',
+    periodType: 'CALENDAR_YEAR', fiscalPeriod: 'FY', fiscalYear: 2025,
+    filingForm: '10-K', filingUrl: 'https://www.sec.gov/capex-group.htm',
+    dateAuthority: DATE_AUTHORITY.REPORTED, explicitPeriodMapping: true,
+    metricCandidates: ['capitalExpenditures'], namespace: 'testco',
+  }
+  const result = adaptSecCanonicalFinancials({
+    company, facts: { cik: company.cik, facts: {} }, metrics: ['capitalExpenditures'],
+    supplementalFacts: [
+      { ...common, id: 'ppe-a', accessionNumber: 'filing-a', filingDate: '2026-01-01',
+        concept: 'PaymentsToAcquirePropertyPlantAndEquipmentNetOfComputerHardware',
+        label: 'Payments for property, plant and equipment, net of computer hardware', value: -100 },
+      { ...common, id: 'hardware-a', accessionNumber: 'filing-a', filingDate: '2026-01-01',
+        concept: 'PurchasesOfComputerHardware', label: 'Purchases of computer hardware', value: -40 },
+      { ...common, id: 'ppe-b', accessionNumber: 'filing-b', filingDate: '2026-02-01',
+        concept: 'PaymentsToAcquirePropertyPlantAndEquipmentNetOfComputerHardware',
+        label: 'Payments for property, plant and equipment, net of computer hardware', value: -110 },
+      { ...common, id: 'hardware-b', accessionNumber: 'filing-b', filingDate: '2026-02-01',
+        concept: 'PurchasesOfComputerHardware', label: 'Purchases of computer hardware', value: -40 },
+    ],
+  })
+  const capex = result.observations[0]
+  assert.equal(capex.normalizedValue, 150)
+  assert.equal(capex.deduplicationStatus, 'REQUIRES_REVIEW')
+  assert.equal(capex.conflicts[0].type, 'SOURCE_VALUE_CONFLICT')
+  assert.deepEqual(capex.conflicts[0].values, [150, 140])
+  assert.ok(capex.conflicts[0].sourceIds.includes('hardware-a|PLUS|ppe-a'))
+  assert.equal(capex.derivation.reconciliation.competingAdditiveGroups.length, 2)
+  assert.equal(capex.derivation.reconciliation.passed, false)
+})
+
+test('a documented recast can resolve a competing additive Capex group with accession evidence', () => {
+  const common = {
+    units: 'USD', currency: 'USD', startDate: '2025-01-01', endDate: '2025-12-31',
+    periodType: 'CALENDAR_YEAR', fiscalPeriod: 'FY', fiscalYear: 2025,
+    filingForm: '10-K', filingUrl: 'https://www.sec.gov/capex-recast.htm',
+    dateAuthority: DATE_AUTHORITY.REPORTED, explicitPeriodMapping: true,
+    metricCandidates: ['capitalExpenditures'], namespace: 'testco',
+  }
+  const result = adaptSecCanonicalFinancials({
+    company, facts: { cik: company.cik, facts: {} }, metrics: ['capitalExpenditures'],
+    supplementalFacts: [
+      { ...common, id: 'ppe-a', accessionNumber: 'filing-a', filingDate: '2026-01-01',
+        concept: 'PaymentsToAcquirePropertyPlantAndEquipmentNetOfComputerHardware',
+        label: 'Payments for property, plant and equipment, net of computer hardware', value: -100 },
+      { ...common, id: 'hardware-a', accessionNumber: 'filing-a', filingDate: '2026-01-01',
+        concept: 'PurchasesOfComputerHardware', label: 'Purchases of computer hardware', value: -40 },
+      { ...common, id: 'ppe-b', accessionNumber: 'filing-b', filingDate: '2026-02-01',
+        concept: 'PaymentsToAcquirePropertyPlantAndEquipmentNetOfComputerHardware',
+        label: 'Payments for property, plant and equipment, net of computer hardware', value: -110,
+        restatedOrRecast: true, restatementEvidence: { supersedesAccessions: ['filing-a'] } },
+      { ...common, id: 'hardware-b', accessionNumber: 'filing-b', filingDate: '2026-02-01',
+        concept: 'PurchasesOfComputerHardware', label: 'Purchases of computer hardware', value: -40,
+        restatedOrRecast: true, restatementEvidence: { supersedesAccessions: ['filing-a'] } },
+    ],
+  })
+  const capex = result.observations[0]
+  assert.equal(capex.normalizedValue, 150)
+  assert.notEqual(capex.deduplicationStatus, 'REQUIRES_REVIEW')
+  assert.equal(capex.derivation.reconciliation.documentedRecast.length, 2)
+  assert.equal(capex.derivation.reconciliation.competingAdditiveGroups.length, 2)
+  assert.equal(capex.derivation.reconciliation.passed, true)
+})
+
 test('generic PP&E and hardware labels are not summed without explicit non-overlap evidence', () => {
   const accessionNumber = 'ambiguous-capex-components'
   const common = {

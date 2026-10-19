@@ -60,14 +60,27 @@ function dedupeAndSort(rows) {
     String(right.accessionNumber).localeCompare(String(left.accessionNumber)))
 }
 
+function hasCompleteSubmissionRows(rows) {
+  const forms = rows?.form
+  const accessions = rows?.accessionNumber
+  const reportDates = rows?.reportDate
+  return Array.isArray(forms) && Array.isArray(accessions) && Array.isArray(reportDates) &&
+    forms.length === accessions.length && forms.length === reportDates.length &&
+    forms.every((form, index) => Boolean(form && accessions[index] && reportDates[index]))
+}
+
 export async function buildFilingIndex(company, options = {}) {
   if (!company?.cik) return { company, filings: [], sourceHash: null, retrievedAt: new Date().toISOString() }
   const submissions = options.submissions ?? await getCompanySubmissions(company.cik, options)
+  const recentInventoryPresent = hasCompleteSubmissionRows(submissions?.filings?.recent)
   const rows = normalizeRows(company, submissions?.filings?.recent)
   const archivedFiles = submissions?.filings?.files ?? []
+  let archivedFilesLoaded = 0
   for (const archive of archivedFiles) {
     if (!archive?.name) continue
     const payload = await getCompanySubmissionsFile(archive.name, options)
+    if (!hasCompleteSubmissionRows(payload)) continue
+    archivedFilesLoaded += 1
     rows.push(...normalizeRows(company, payload))
   }
   const filings = dedupeAndSort(rows)
@@ -79,6 +92,14 @@ export async function buildFilingIndex(company, options = {}) {
       fiscalYearEnd: submissions?.fiscalYearEnd ?? null,
     },
     filings,
+    inventoryEvidence: {
+      source: 'SEC_COMPANY_SUBMISSIONS',
+      complete: recentInventoryPresent && archivedFilesLoaded === archivedFiles.filter((item) => item?.name).length,
+      recentInventoryPresent,
+      archivedFilesListed: archivedFiles.filter((item) => item?.name).length,
+      archivedFilesLoaded,
+      financialFilingCount: filings.length,
+    },
     sourceHash: hash(JSON.stringify(filings.map((filing) => [filing.accessionNumber, filing.primaryDocument]))),
     retrievedAt: new Date().toISOString(),
   }

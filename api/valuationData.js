@@ -44,7 +44,7 @@ const CONSENSUS_CACHE_TTL_MS = 30 * 60 * 1000
 const cache = new Map()
 const inFlight = new Map()
 const canonicalHistoryCache = createPerTickerCache({
-  namespace: 'canonical-history',
+  namespace: 'canonical-history-search-completeness-v2',
   ttlMs: CANONICAL_CACHE_TTL_MS,
 })
 const adjustedEbitdaCache = createPerTickerCache({
@@ -391,12 +391,15 @@ export async function loadSupplementalProductionTask(input, dependencies = {}, t
   const loadCached = dependencies.loadCached ?? loadLatestSupplementalSourceFacts
   const loadSupplemental = dependencies.loadSupplemental ?? loadSupplementalFilingFacts
   const result = await runAbortableTask('SUPPLEMENTAL_SEC_EXTRACTION', async (signal) => {
-    const cached = input.refresh ? null : await loadCached(input.company).catch(() => null)
+    const cached = input.refresh || input.requireCompleteInventory
+      ? null
+      : await loadCached(input.company).catch(() => null)
     if (cached) return cached
     return loadSupplemental({
       company: input.company,
       filingIndex: input.filingIndex,
       years: input.years,
+      companyFactsRetrieved: input.companyFactsRetrieved === true,
       signal,
     })
   }, timeoutMs, { records: [], errors: [] })
@@ -566,9 +569,23 @@ export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows 
   if (factsResult.diagnostic) sourceDiagnostics.push(factsResult.diagnostic)
   const cacheKey = `${ticker}:${years.actual.join('-')}${options.profileCacheKey ?? ''}`
   let canonicalHistoryRebuilt = false
+  const auditedAdjustedEbitdaComplete = hasCompleteAuditedAdjustedEbitda(auditedFinancials, years.actual)
+  const needsSupplemental = Boolean(company && filingIndex && operatingCompany && facts)
+  let supplementalPromise
+  const getSupplemental = () => {
+    supplementalPromise ??= needsSupplemental
+      ? measureLatency(profile, 'supplementalSec', () => loadSupplementalProductionTask({
+          company, filingIndex, years: years.actual, skipSupplemental: false,
+          refresh: Boolean(options.refreshAdjustedEbitda), requireCompleteInventory: true,
+          companyFactsRetrieved: facts != null,
+        }, options.supplementalDependencies ?? {}, SEC_SOURCE_TIMEOUT_MS))
+      : Promise.resolve({ records: [], errors: [], failure: null })
+    return supplementalPromise
+  }
   const canonicalCached = company && facts && filingIndex && operatingCompany
-    ? await measureLatency(profile, 'canonicalCacheLookup', () => canonicalHistoryCache.get(cacheKey, () => {
+    ? await measureLatency(profile, 'canonicalCacheLookup', () => canonicalHistoryCache.get(cacheKey, async () => {
         canonicalHistoryRebuilt = true
+        const supplementalResult = await getSupplemental()
         return measureLatency(profile, 'canonicalHistoricalRebuild', () =>
           (options.canonicalHistoricalBuilder ?? buildCanonicalHistoricalFinancials)({
           ticker,
@@ -577,6 +594,8 @@ export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows 
           facts,
           filings: filingIndex,
           years: years.actual,
+          additionalSupplementalFacts: supplementalResult.records ?? [],
+          sourceSearchEvidence: supplementalResult.sourceSearchEvidence ?? null,
           asOfDate: localDateString(),
           targetedSecTimeoutMs: SEC_SOURCE_TIMEOUT_MS,
           onTiming: (stage, elapsedMs, details) => recordLatency(profile, stage, elapsedMs, details),
@@ -590,15 +609,6 @@ export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows 
         cache: { state: 'ERROR', ageMs: null, refreshing: false },
       }))
     : { value: { canonical: null, failure: null }, cache: { state: 'UNAVAILABLE', ageMs: null, refreshing: false } }
-  const auditedAdjustedEbitdaComplete = hasCompleteAuditedAdjustedEbitda(auditedFinancials, years.actual)
-  const needsSupplemental = Boolean(company && facts && operatingCompany &&
-    (options.includeAdjustedEbitda || options.includeForwardBasis))
-  const supplementalPromise = needsSupplemental
-    ? measureLatency(profile, 'supplementalSec', () => loadSupplementalProductionTask({
-        company, filingIndex, years: years.actual, skipSupplemental: false,
-        refresh: Boolean(options.refreshAdjustedEbitda),
-      }, options.supplementalDependencies ?? {}, SEC_SOURCE_TIMEOUT_MS))
-    : Promise.resolve({ records: [], errors: [], failure: null })
   const adjustedLoader = () => measureLatency(profile, 'adjustedEbitda', () => loadAdjustedEbitdaProductionTask({
     company,
     facts,

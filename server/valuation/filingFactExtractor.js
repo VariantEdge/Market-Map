@@ -10,6 +10,15 @@ const DOCUMENT_FORMS = new Set([
   '8-K', '8-K/A', '6-K', 'S-1', 'S-1/A', 'F-1', 'F-1/A', '10', '10/A', '10-12B', '10-12B/A',
 ])
 
+const AUDIT_SEARCH_METRICS = Object.freeze({
+  revenue: ['RevenueFromContractWithCustomerExcludingAssessedTax', 'SalesRevenueNet', 'Revenues'],
+  grossProfit: ['GrossProfit', 'RevenueFromContractWithCustomerExcludingAssessedTax', 'CostOfRevenue'],
+  ebit: ['OperatingIncomeLoss'],
+  operatingCashFlow: ['NetCashProvidedByUsedInOperatingActivities'],
+  capitalExpenditures: ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets'],
+  freeCashFlow: ['NetCashProvidedByUsedInOperatingActivities', 'PaymentsToAcquirePropertyPlantAndEquipment'],
+})
+
 function decodeHtml(value) {
   return String(value ?? '')
     .replace(/&nbsp;|&#160;/gi, ' ')
@@ -972,12 +981,29 @@ export function selectSupplementalFilings({ filingIndex, years, maxFilings = 36 
   ].map((filing) => [filing.accessionNumber, filing])).values()].slice(0, maxFilings)
 }
 
-export async function loadSupplementalFilingFacts({ company, filingIndex, years, maxFilings = 36, signal }) {
+export async function loadSupplementalFilingFacts({ company, filingIndex, years, maxFilings = 36, signal,
+  companyFactsRetrieved = false }) {
   const sourceCompany = {
     ...company,
     fiscalYearEnd: filingIndex?.company?.fiscalYearEnd ?? company?.fiscalYearEnd ?? null,
   }
   const candidates = selectSupplementalFilings({ filingIndex, years, maxFilings })
+  const candidateAccessions = new Set(candidates.map((filing) => filing.accessionNumber))
+  const minimumYear = Math.min(...years.map(Number)) - 1
+  const eligibleInventory = (filingIndex?.filings ?? []).filter((filing) =>
+    DOCUMENT_FORMS.has(filing.form) && filing.filingUrl &&
+    Number(String(filing.reportDate || filing.filingDate).slice(0, 4)) >= minimumYear)
+  const relevantByYear = Object.fromEntries(years.map((year) => {
+    const targetYear = Number(year)
+    const relevant = eligibleInventory.filter((filing) => {
+      const filingYear = Number(String(filing.reportDate || filing.filingDate).slice(0, 4))
+      return Number.isInteger(filingYear) && filingYear >= targetYear - 1 && filingYear <= targetYear + 1
+    })
+    return [targetYear, {
+      filings: relevant,
+      excluded: relevant.filter((filing) => !candidateAccessions.has(filing.accessionNumber)),
+    }]
+  }))
   const records = []
   const errors = []
   const completedFilings = []
@@ -1019,6 +1045,50 @@ export async function loadSupplementalFilingFacts({ company, filingIndex, years,
     }
   }
   const completed = candidates.length > 0 && errors.length === 0 && completedFilings.length === candidates.length
+  const completedByAccession = new Map(completedFilings.map((filing) => [filing.accessionNumber, filing]))
+  const inventoryComplete = filingIndex?.inventoryEvidence?.source === 'SEC_COMPANY_SUBMISSIONS' &&
+    filingIndex.inventoryEvidence.complete === true
+  const metricYearEvidence = Object.fromEntries(Object.entries(AUDIT_SEARCH_METRICS).map(([metric, concepts]) => [metric,
+    Object.fromEntries(years.map((year) => {
+      const inventory = relevantByYear[Number(year)]
+      const sourcesExamined = inventory.filings.filter((filing) => candidateAccessions.has(filing.accessionNumber))
+        .map((filing) => completedByAccession.get(filing.accessionNumber))
+        .filter(Boolean)
+        .map((filing) => ({
+          sourceId: `SEC:${String(company?.cik ?? '').padStart(10, '0')}:${filing.accessionNumber}`,
+          accessionNumber: filing.accessionNumber,
+          form: filing.form,
+          filingDate: filing.filingDate,
+          reportDate: filing.reportDate,
+          filingUrl: filing.filingUrl,
+          extractionCompleted: filing.extractionCompleted,
+        }))
+      const excludedAccessions = inventory.excluded.map((filing) => filing.accessionNumber)
+      const relevantComplete = inventoryComplete && companyFactsRetrieved === true &&
+        excludedAccessions.length === 0 && sourcesExamined.length === inventory.filings.length &&
+        sourcesExamined.every((source) => source.extractionCompleted === true) && errors.length === 0
+      return [Number(year), {
+        completed: relevantComplete,
+        failed: errors.length > 0 || companyFactsRetrieved !== true || !inventoryComplete,
+        timedOut: false,
+        metric,
+        targetStart: `${year}-01-01`,
+        targetEnd: `${year}-12-31`,
+        source: 'SEC_COMPANY_SUBMISSIONS_PLUS_COMPANYFACTS',
+        sourceInventoryComplete: inventoryComplete,
+        companyFactsRetrieved: companyFactsRetrieved === true,
+        relevantFilingCount: inventory.filings.length,
+        selectedRelevantFilingCount: sourcesExamined.length,
+        excludedRelevantAccessions: excludedAccessions,
+        relevantAccessions: inventory.filings.map((filing) => filing.accessionNumber),
+        sourcesExamined,
+        conceptFamiliesExamined: ['SEC_COMPANY_FACTS', 'SEC_INLINE_XBRL', 'SEC_STRUCTURED_FINANCIAL_TABLES'],
+        conceptsExamined: concepts,
+      }]
+    }))
+  ]))
+  const allMetricPeriodsComplete = Object.values(metricYearEvidence).every((byYear) =>
+    Object.values(byYear).every((evidence) => evidence.completed))
   const eligibleReconciliationsFound = records.filter((record) =>
     record.metricCandidates?.includes('adjustedEbitda') &&
     record.rawSourceType === 'SEC_NON_GAAP_RECONCILIATION_TABLE').length
@@ -1044,11 +1114,14 @@ export async function loadSupplementalFilingFacts({ company, filingIndex, years,
     errors,
     filingsExamined: candidates.length,
     sourceSearchEvidence: {
-      completed,
-      failed: errors.length > 0,
+      completed: allMetricPeriodsComplete,
+      failed: errors.length > 0 || !inventoryComplete || companyFactsRetrieved !== true,
       timedOut: false,
       requestedYears: [...years],
       candidateCount: candidates.length,
+      inventoryEvidence: filingIndex?.inventoryEvidence ?? null,
+      eligibleInventoryCount: eligibleInventory.length,
+      metricYearEvidence,
       sourcesExamined: completedFilings.map((filing) => ({
         sourceId: `SEC:${String(company?.cik ?? '').padStart(10, '0')}:${filing.accessionNumber}`,
         accessionNumber: filing.accessionNumber,
@@ -1062,13 +1135,15 @@ export async function loadSupplementalFilingFacts({ company, filingIndex, years,
     },
     negativeSearchEvidence: {
       searchType: 'SEC_COMPANY_DEFINED_ADJUSTED_EBITDA',
-      completed,
-      failed: errors.length > 0,
+      completed: allMetricPeriodsComplete,
+      failed: errors.length > 0 || !inventoryComplete || companyFactsRetrieved !== true,
       timedOut: false,
       requestedYears: [...years],
       coveredPeriods,
       eligibleReconciliationsFound,
       eligibleReconciliationsByPeriod,
+      inventoryEvidence: filingIndex?.inventoryEvidence ?? null,
+      companyFactsRetrieved: companyFactsRetrieved === true,
       filingsExamined: completedFilings,
       extractionErrors: errors,
     },

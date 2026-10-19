@@ -247,7 +247,9 @@ for (const [tickerIndex, ticker] of requestedTickers.entries()) {
     const filingIndex = await buildFilingIndex(company)
     const classification = classifyIssuer({ ticker, company, filings: filingIndex.filings })
     const facts = await getCompanyFacts(company.cik).catch(() => null)
-    const supplemental = await loadSupplementalFilingFacts({ company, filingIndex, years })
+    const supplemental = await loadSupplementalFilingFacts({
+      company, filingIndex, years, companyFactsRetrieved: facts != null,
+    })
     const ledger = await buildCanonicalQuarterlyLedger({
       company, facts, years, filingIndex, supplementalRawFacts: supplemental.records,
       negativeSearchEvidence: supplemental.negativeSearchEvidence ?? null,

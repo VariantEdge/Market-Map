@@ -212,13 +212,63 @@ test('complete primary-source filing search proves an exact calendar coverage ga
     metric: 'capitalExpenditures',
     targetStart: '2024-01-01',
     targetEnd: '2024-12-31',
-    sourcesExamined: [{ sourceId: 'SEC:AUGCO:10-K-2024', extractionCompleted: true }],
+    source: 'SEC_COMPANY_SUBMISSIONS_PLUS_COMPANYFACTS',
+    sourceInventoryComplete: true,
+    companyFactsRetrieved: true,
+    relevantFilingCount: 1,
+    selectedRelevantFilingCount: 1,
+    relevantAccessions: ['10-K-2024'],
+    excludedRelevantAccessions: [],
+    conceptFamiliesExamined: ['SEC_COMPANY_FACTS', 'SEC_INLINE_XBRL'],
+    conceptsExamined: ['PaymentsToAcquirePropertyPlantAndEquipment'],
+    sourcesExamined: [{ sourceId: 'SEC:AUGCO:10-K-2024', accessionNumber: '10-K-2024', extractionCompleted: true }],
   }
   const result = buildCalendarYear(records, 2024, { sourceSearchCompleteness })
   assert.equal(result.value, null)
   assert.equal(result.status, HISTORICAL_RESULT_STATUS.LEGITIMATE_NA)
   assert.equal(result.reason, 'EXACT_CALENDAR_YEAR_NOT_REPORTED_OR_EXACTLY_DERIVABLE')
   assert.equal(result.nullEvidence.sourceSearchCompleteness, sourceSearchCompleteness)
+})
+
+test('selected filing extraction cannot prove exact calendar N/A when filing inventory is incomplete', () => {
+  const records = [
+    observation({ ticker: 'AUGCO', metric: 'capitalExpenditures', type: PERIOD_TYPE.FISCAL_YEAR,
+      start: '2023-09-01', end: '2024-08-31', value: 100, fiscalYear: 2024 }),
+    observation({ ticker: 'AUGCO', metric: 'capitalExpenditures', type: PERIOD_TYPE.STANDALONE_QUARTER,
+      start: '2024-03-01', end: '2024-05-31', value: 20, fiscalYear: 2024, fiscalQuarter: 3 }),
+  ]
+  const completeButExcluded = {
+    completed: true, failed: false, timedOut: false, metric: 'capitalExpenditures',
+    targetStart: '2024-01-01', targetEnd: '2024-12-31',
+    source: 'SEC_COMPANY_SUBMISSIONS_PLUS_COMPANYFACTS', sourceInventoryComplete: true,
+    companyFactsRetrieved: true, relevantFilingCount: 2, selectedRelevantFilingCount: 1,
+    relevantAccessions: ['10-K-2024', '10-Q-2024'], excludedRelevantAccessions: ['10-Q-2024'],
+    conceptFamiliesExamined: ['SEC_COMPANY_FACTS'], conceptsExamined: ['PaymentsToAcquirePropertyPlantAndEquipment'],
+    sourcesExamined: [{ sourceId: 'SEC:AUGCO:10-K-2024', accessionNumber: '10-K-2024', extractionCompleted: true }],
+  }
+  const result = buildCalendarYear(records, 2024, { sourceSearchCompleteness: completeButExcluded })
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE)
+  assert.equal(result.nullEvidence, undefined)
+})
+
+test('CompanyFacts retrieval failure cannot be hidden by otherwise-complete filing extraction', () => {
+  const records = [
+    observation({ ticker: 'AUGCO', metric: 'capitalExpenditures', type: PERIOD_TYPE.FISCAL_YEAR,
+      start: '2023-09-01', end: '2024-08-31', value: 100, fiscalYear: 2024 }),
+    observation({ ticker: 'AUGCO', metric: 'capitalExpenditures', type: PERIOD_TYPE.STANDALONE_QUARTER,
+      start: '2024-03-01', end: '2024-05-31', value: 20, fiscalYear: 2024, fiscalQuarter: 3 }),
+  ]
+  const result = buildCalendarYear(records, 2024, { sourceSearchCompleteness: {
+    completed: true, failed: true, timedOut: false, metric: 'capitalExpenditures',
+    targetStart: '2024-01-01', targetEnd: '2024-12-31',
+    source: 'SEC_COMPANY_SUBMISSIONS_PLUS_COMPANYFACTS', sourceInventoryComplete: true,
+    companyFactsRetrieved: false, relevantFilingCount: 1, selectedRelevantFilingCount: 1,
+    relevantAccessions: ['10-K'], excludedRelevantAccessions: [],
+    conceptFamiliesExamined: ['SEC_COMPANY_FACTS'], conceptsExamined: ['PaymentsToAcquirePropertyPlantAndEquipment'],
+    sourcesExamined: [{ sourceId: 'SEC:AUGCO:10-K', accessionNumber: '10-K', extractionCompleted: true }],
+  } })
+  assert.equal(result.status, HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE)
+  assert.equal(result.nullEvidence, undefined)
 })
 
 test('failed primary-source filing search cannot prove an exact calendar coverage gap', () => {

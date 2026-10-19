@@ -400,6 +400,8 @@ function rawSupplementalCandidates({ company, filings, records, metrics, retriev
         sourceUrl: record.filingUrl ?? null,
         sourceId: record.provenance?.sourceId ?? record.id,
         retrievedAt: record.provenance?.retrievedAt ?? retrievedAt,
+        restatedOrRecast: record.restatedOrRecast === true,
+        restatementEvidence: record.restatementEvidence ?? null,
       })
     }
   }
@@ -498,7 +500,8 @@ function additiveCapexCandidate(candidates) {
       .sort((left, right) => dateAuthorityRank(left) - dateAuthorityRank(right) ||
         String(right.filingDate ?? '').localeCompare(String(left.filingDate ?? '')) ||
         String(left.sourceId).localeCompare(String(right.sourceId)))[0])
-    return { accession, components, items }
+    return { accession, components, items,
+      total: components.reduce((total, candidate) => total + Number(candidate.normalizedValue), 0) }
   }).filter(Boolean).sort((left, right) =>
     String(right.components[0].filingDate ?? '').localeCompare(String(left.components[0].filingDate ?? '')) ||
     String(right.accession).localeCompare(String(left.accession)))
@@ -507,6 +510,20 @@ function additiveCapexCandidate(candidates) {
   if (new Set(components.map((candidate) => candidate.sourceId)).size !== components.length) return null
   const first = components[0]
   const additiveValue = components.reduce((total, item) => total + Number(item.normalizedValue), 0)
+  const competingGroups = completeGroups.filter((group) => !valuesAgree(group.total, additiveValue))
+  const documentedRecast = competingGroups.length > 0 && components.every((component) =>
+    component.restatedOrRecast === true &&
+    Array.isArray(component.restatementEvidence?.supersedesAccessions) &&
+    competingGroups.every((group) => component.restatementEvidence.supersedesAccessions.includes(group.accession)))
+  const groupConflicts = competingGroups.length && !documentedRecast
+    ? competingGroups.map((group) => ({
+        sourceId: group.components.map((item) => item.sourceId).sort().join('|PLUS|'),
+        normalizedValue: group.total,
+        accession: group.accession,
+        filingDate: group.components.map((item) => item.filingDate).sort().at(-1) ?? null,
+        components: group.components.map(capexDerivationInput),
+      }))
+    : []
   const otherPlausibleCandidates = eligible.filter((candidate) => !additiveCapexClass(candidate))
   const alternatives = eligible.filter((candidate) => !components.some((component) =>
     component.sourceId === candidate.sourceId))
@@ -528,8 +545,8 @@ function additiveCapexCandidate(candidates) {
     label: 'Additive non-overlapping cash capex components',
     sourceId: components.map((item) => item.sourceId).sort().join('|PLUS|'),
     alternatives,
-    conflicts: conflictingCandidates,
-    conflictReason: conflictingCandidates.length ? 'SOURCE_VALUE_CONFLICT' : null,
+    conflicts: [...conflictingCandidates, ...groupConflicts],
+    conflictReason: conflictingCandidates.length || groupConflicts.length ? 'SOURCE_VALUE_CONFLICT' : null,
     restatedOrRecast: components.some((item) => item.restatedOrRecast),
     reportedVsDerived: OBSERVATION_BASIS.DERIVED,
     derivation: {
@@ -537,13 +554,19 @@ function additiveCapexCandidate(candidates) {
       exactness: 'EXACT_ARITHMETIC',
       componentClasses,
       inputs: components.map(capexDerivationInput),
-      reconciliation: otherPlausibleCandidates.length ? {
+      reconciliation: otherPlausibleCandidates.length || completeGroups.length > 1 ? {
         method: 'ADDITIVE_SUM_VS_ALL_PLAUSIBLE_CAPEX_CANDIDATES',
         additiveValue,
         componentCorroborations: componentCorroborations.map(capexDerivationInput),
         reportedTotals: reportedTotals.map(capexDerivationInput),
         conflictingCandidates: conflictingCandidates.map(capexDerivationInput),
-        passed: conflictingCandidates.length === 0,
+        competingAdditiveGroups: completeGroups.map((group) => ({
+          accession: group.accession,
+          total: group.total,
+          components: group.components.map(capexDerivationInput),
+        })),
+        documentedRecast: documentedRecast ? components.map((component) => component.restatementEvidence) : null,
+        passed: conflictingCandidates.length === 0 && groupConflicts.length === 0,
       } : null,
     },
   }
@@ -559,7 +582,18 @@ function selectCandidatePeriod(group, definition) {
       byConcept.set(key, candidate)
     }
   }
-  const resolvedConcepts = [...byConcept.values()].sort((left, right) =>
+  const retainedCandidates = [...byConcept.values()]
+  if (group[0]?.metric === 'capitalExpenditures') {
+    const retainedIds = new Set(retainedCandidates.map((candidate) => candidate.sourceId))
+    for (const candidate of group) {
+      if (additiveCapexClass(candidate) && candidate.explicitPeriodMapping === true &&
+          candidate.sourceId && candidate.accession && !retainedIds.has(candidate.sourceId)) {
+        retainedCandidates.push(candidate)
+        retainedIds.add(candidate.sourceId)
+      }
+    }
+  }
+  const resolvedConcepts = retainedCandidates.sort((left, right) =>
     dateAuthorityRank(left) - dateAuthorityRank(right) || candidateOrder(left, right, definition))
   const selected = resolvedConcepts[0]
   const selectedRank = conceptRank(selected, definition)
@@ -1246,15 +1280,7 @@ export function buildSecEnrichedFinancialsShadow({
 
   const calendarActuals = Object.fromEntries(SEC_CANONICAL_METRICS.map((metric) => [metric,
     Object.fromEntries(years.map((year) => [year, buildCalendarYear(records[metric], year, {
-      sourceSearchCompleteness: sourceSearchEvidence?.completed === true &&
-        sourceSearchEvidence?.failed !== true && sourceSearchEvidence?.timedOut !== true
-        ? {
-            ...sourceSearchEvidence,
-            metric,
-            targetStart: `${year}-01-01`,
-            targetEnd: `${year}-12-31`,
-          }
-        : null,
+      sourceSearchCompleteness: sourceSearchEvidence?.metricYearEvidence?.[metric]?.[year] ?? null,
     })])),
   ]))
   const ltm = Object.fromEntries(SEC_CANONICAL_METRICS.map((metric) => [metric,
@@ -1269,6 +1295,7 @@ export function buildSecEnrichedFinancialsShadow({
     ltm,
     latestReportedPeriods,
     secValueFilled,
+    sourceSearchEvidence,
     failures,
   }
 }

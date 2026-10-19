@@ -59,6 +59,25 @@ test('historical audit rejects LEGITIMATE_NA backed only by a fabricated coverag
     issue.reason === 'NULL_WITHOUT_POSITIVE_EVIDENCE' && issue.status === 'LEGITIMATE_NA'))
 })
 
+test('historical audit rejects exact-calendar N/A evidence when a relevant filing was excluded', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  const target = records.find((item) => item.metric === 'revenue' && item.calendarYear === '2025A')
+  const search = completedCalendarSearchEvidence('revenue', 2025)
+  search.relevantFilingCount = 2
+  search.relevantAccessions.push('0001-25-000002')
+  search.excludedRelevantAccessions = ['0001-25-000002']
+  Object.assign(target, {
+    displayedValue: null, validationStatus: 'LEGITIMATE_NA',
+    failureReason: 'EXACT_CALENDAR_YEAR_NOT_REPORTED_OR_EXACTLY_DERIVABLE',
+    quarterlyComponents: [evidenceComponent('gap-a'), evidenceComponent('gap-b')],
+    nullEvidence: { type: 'EXACT_CALENDAR_PERIOD_COVERAGE_GAP', exactCalendarizationProhibited: true,
+      targetStart: '2025-01-01', targetEnd: '2025-12-31', availablePeriods: [{}, {}],
+      sourceSearchCompleteness: search },
+  })
+  assert.ok(validateHistoricalAuditRecords(records, { tickers, metrics, periods }).some((issue) =>
+    issue.reason === 'NULL_WITHOUT_POSITIVE_EVIDENCE' && issue.status === 'LEGITIMATE_NA'))
+})
+
 function evidenceComponent(sourceId, overrides = {}) {
   return {
     sourceProvider: 'SEC', sourceId,
@@ -82,6 +101,7 @@ function completedNegativeSearchEvidence(period = '2025A') {
 }
 
 function completedCalendarSearchEvidence(metric = 'adjustedEbitda', year = 2025) {
+  const accessionNumber = '0001-25-000001'
   return {
     completed: true,
     failed: false,
@@ -89,7 +109,16 @@ function completedCalendarSearchEvidence(metric = 'adjustedEbitda', year = 2025)
     metric,
     targetStart: `${year}-01-01`,
     targetEnd: `${year}-12-31`,
-    sourcesExamined: [{ sourceId: 'SEC:0001-25-000001', extractionCompleted: true }],
+    source: 'SEC_COMPANY_SUBMISSIONS_PLUS_COMPANYFACTS',
+    sourceInventoryComplete: true,
+    companyFactsRetrieved: true,
+    relevantFilingCount: 1,
+    selectedRelevantFilingCount: 1,
+    relevantAccessions: [accessionNumber],
+    excludedRelevantAccessions: [],
+    conceptFamiliesExamined: ['SEC_COMPANY_FACTS', 'SEC_INLINE_XBRL'],
+    conceptsExamined: ['Revenue'],
+    sourcesExamined: [{ sourceId: `SEC:${accessionNumber}`, accessionNumber, extractionCompleted: true }],
   }
 }
 
