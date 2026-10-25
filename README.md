@@ -8,4 +8,4 @@ Standalone Vite/React application containing the Market Map, Watchlist, and Valu
 2. Run `npm install`.
 3. Run `npm run dev`.
 
-Supabase provides stored prices and price history. Watchlist and valuation requests also use their existing Yahoo Finance, SEC EDGAR, and optional WiseSheets integrations. Local Ollama and SearXNG are optional and are used only by company chat and earnings commentary when enabled.
+Supabase provides stored prices and price history. Valuation uses Fiscal.ai as its historical provider candidate, verifies economic periods and values against SEC filings, and reads durable financial snapshots for normal page loads. Supply a server-only `FISCAL_API_KEY` from a Fiscal.ai Data API subscription for controlled refreshes; the Codex MCP connection is not a production credential. `FINANCIAL_HISTORY_PROVIDER=WISESHEETS` explicitly activates the retained rollback path. Yahoo Finance supplies market and consensus data. Local Ollama and SearXNG are optional for company chat and earnings commentary.

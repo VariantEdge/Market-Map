@@ -124,7 +124,7 @@ function withConflict(observation, conflict) {
 
 function sourceRank(observation) {
   const provider = observation.sourceProvider.toUpperCase()
-  return (provider === 'WISESHEETS' ? 300 : provider === 'SEC' ? 200 : 100) +
+  return (provider === 'WISESHEETS' || provider === 'FISCAL.AI' ? 300 : provider === 'SEC' ? 200 : 100) +
     (observation.accession ? 20 : 0) + (observation.sourceUrl ? 10 : 0)
 }
 

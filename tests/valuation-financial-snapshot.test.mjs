@@ -146,6 +146,7 @@ test('valid v2 snapshot migrates and persists without financial provider work', 
   const response = await getValuationRows(null, ['BE'], {
     snapshotRepository: repository,
     marketLoader: marketLoader({ count: 0 }),
+    providerMode: 'WISESHEETS',
     providerLoader: async () => { wiseSheetsCalls += 1; return { value: [] } },
     financialRowBuilder: async () => { rebuilds += 1; return financialRow('BE') },
     activityCounters,
@@ -216,6 +217,7 @@ test('financial refresh scopes WiseSheets acquisition to only rebuilt tickers', 
     providerTickers: universe,
     snapshotRepository: repository,
     marketLoader: marketLoader({ count: 0 }),
+    providerMode: 'WISESHEETS',
     providerLoader: async (requested) => {
       providerRequests.push([...requested])
       return { value: requested.map((ticker) => ({ ticker })), cache: { state: 'MISS' } }
@@ -265,6 +267,7 @@ test('degraded financial refresh does not overwrite durable last-known-good valu
     financialRefresh: true,
     snapshotRepository: repository,
     marketLoader: marketLoader({ count: 0 }),
+    providerMode: 'WISESHEETS',
     providerLoader: async () => ({ value: [], cache: { state: 'MISS' } }),
     financialRowBuilder: async () => candidate,
     profileCacheKey: `promotion-guard-${Date.now()}`,
@@ -277,6 +280,75 @@ test('degraded financial refresh does not overwrite durable last-known-good valu
   const stored = await repository.load(null, ['SYNTH'], { actualYears: ACTUAL_YEARS })
   assert.equal(stored.snapshots.get('SYNTH').metrics.revenue.LTM, 3_113_150_000)
   assert.equal(stored.snapshots.get('SYNTH').financialSnapshot.updatedAt, updatedAt)
+})
+
+test('Fiscal.ai outage preserves the existing snapshot and reports a failed refresh', async () => {
+  const repository = createMemoryFinancialSnapshotRepository()
+  await repository.save(null, 'BE', financialRow('BE', 2_023_994_000), { actualYears: ACTUAL_YEARS })
+  let builds = 0
+  let saves = 0
+  const response = await getValuationRows(null, ['BE'], {
+    financialRefresh: true,
+    snapshotRepository: {
+      load: repository.load,
+      save: async (...args) => { saves += 1; return repository.save(...args) },
+    },
+    marketLoader: marketLoader({ count: 0 }),
+    providerLoader: async () => ({ value: null, diagnostic: {
+      reason: 'FISCAL_AI_HISTORY_FAILED', detail: 'API access is unavailable',
+    } }),
+    financialRowBuilder: async () => { builds += 1; return financialRow('BE', 1) },
+    profileCacheKey: `fiscal-outage-${Date.now()}`,
+  })
+  assert.equal(response.rows[0].metrics.revenue.LTM, 2_023_994_000)
+  assert.equal(response.diagnostics[0].reason, 'FISCAL_AI_HISTORY_FAILED')
+  assert.equal(builds, 0)
+  assert.equal(saves, 0)
+})
+
+test('Fiscal.ai is the default controlled-refresh input and preserves the snapshot contract', async () => {
+  const repository = createMemoryFinancialSnapshotRepository()
+  const payload = { ticker: 'BE', companyKey: 'NYSE_BE', standardizedIncome: { data: [] },
+    standardizedCashFlow: { data: [] }, adjustedMetrics: { data: [] } }
+  let input
+  const response = await getValuationRows(null, ['BE'], {
+    financialRefresh: true,
+    snapshotRepository: repository,
+    marketLoader: marketLoader({ count: 0 }),
+    providerLoader: async () => ({ value: [payload], cache: { state: 'MISS' } }),
+    financialRowBuilder: async (_supabase, _ticker, _years, provider) => {
+      input = provider
+      return financialRow('BE', 2_023_994_000)
+    },
+    profileCacheKey: `fiscal-default-${Date.now()}`,
+  })
+  assert.equal(input, payload)
+  assert.equal(response.rows[0].metrics.revenue.LTM, 2_023_994_000)
+  assert.equal(response.providerCache.state, 'FINANCIAL_REFRESHED')
+  assert.ok((await repository.load(null, ['BE'])).snapshots.has('BE'))
+})
+
+test('incomplete Fiscal.ai ticker batch cannot silently rebuild from WiseSheets', async () => {
+  const repository = createMemoryFinancialSnapshotRepository()
+  await repository.save(null, 'BE', financialRow('BE', 2_023_994_000), { actualYears: ACTUAL_YEARS })
+  let builds = 0
+  let saves = 0
+  const response = await getValuationRows(null, ['BE'], {
+    financialRefresh: true,
+    snapshotRepository: {
+      load: repository.load,
+      save: async (...args) => { saves += 1; return repository.save(...args) },
+    },
+    marketLoader: marketLoader({ count: 0 }),
+    providerLoader: async () => ({ value: [{ ticker: 'AMZN', companyKey: 'NASDAQ_AMZN',
+      standardizedIncome: { data: [] }, standardizedCashFlow: { data: [] },
+      adjustedMetrics: { data: [] } }] }),
+    financialRowBuilder: async () => { builds += 1; return financialRow('BE', 1) },
+  })
+  assert.equal(response.rows[0].metrics.revenue.LTM, 2_023_994_000)
+  assert.equal(response.diagnostics[0].reason, 'FISCAL_AI_SOURCE_UNAVAILABLE')
+  assert.equal(builds, 0)
+  assert.equal(saves, 0)
 })
 
 test('newer authoritative period prevents stale LTM carry-forward', () => {
@@ -348,6 +420,7 @@ test('mixed v2 and v3 cold load uses snapshots without historical providers', as
   const response = await getValuationRows(null, tickers, {
     snapshotRepository: repository,
     marketLoader: marketLoader({ count: 0 }),
+    providerMode: 'WISESHEETS',
     providerLoader: async () => { providers += 1; return { value: [] } },
     financialRowBuilder: async () => { rebuilds += 1; return financialRow('UNEXPECTED') },
     activityCounters,
@@ -432,6 +505,7 @@ test('explicit financial refresh awaits, persists, and keeps GAAP when EBITDA is
     financialRefresh: true,
     snapshotRepository: wrapped,
     marketLoader: marketLoader({ count: 0 }),
+    providerMode: 'WISESHEETS',
     providerLoader: async () => ({ value: [], cache: { state: 'MISS' } }),
     financialRowBuilder: async () => {
       const row = financialRow('BE', 3_113_150_000)
@@ -498,6 +572,7 @@ test('market refresh updates price, daily change, ranges and multiples without f
       price: 50, previousClose: 40, currency: 'USD', fetchedAt: Date.now(),
       chart: { points: [{ close: 25 }, { close: 40 }, { close: 50 }] },
     }]]),
+    providerMode: 'WISESHEETS',
     providerLoader: async () => { providerCalls += 1; return { value: [] } },
     financialRowBuilder: async () => { builderCalls += 1; return financialRow('MSFT') },
     profileCacheKey: `market-${Date.now()}`,
@@ -607,6 +682,7 @@ test('consensus-only refresh changes forward values without invoking financial d
     consensusRefresh: true,
     snapshotRepository: repository,
     marketLoader: marketLoader({ count: 0 }),
+    providerMode: 'WISESHEETS',
     providerLoader: async () => { providerCalls += 1; return { value: [] } },
     financialRowBuilder: async () => { builderCalls += 1; return financialRow('MSFT') },
     consensusLoader: async () => ({ estimates: { revenueConsensus: [

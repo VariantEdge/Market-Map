@@ -7,10 +7,11 @@ const tickers = scenario === 'be' ? ['BE'] : scenario === 'universe' ? UNIVERSE 
 if (!tickers) throw new Error('Usage: node server/valuation/profileLatency.mjs be|universe')
 
 const originalFetch = globalThis.fetch
-const network = { sec: 0, wiseSheets: 0, yahoo: 0, other: 0 }
+const network = { sec: 0, fiscalAi: 0, wiseSheets: 0, yahoo: 0, other: 0 }
 globalThis.fetch = async (input, init) => {
   const url = String(input?.url ?? input)
   if (/\.sec\.gov\//i.test(url)) network.sec += 1
+  else if (/api\.fiscal\.ai\//i.test(url)) network.fiscalAi += 1
   else if (/wisesheets/i.test(url)) network.wiseSheets += 1
   else if (/\.finance\.yahoo\.com\//i.test(url)) network.yahoo += 1
   else network.other += 1
@@ -34,7 +35,7 @@ function summarizeProfiles(profiles) {
     stages,
     caches: {
       aggregate: profiles.map((profile) => profile.caches.aggregate),
-      wiseSheets: profiles.map((profile) => profile.caches.wiseSheets),
+      historicalProvider: profiles.map((profile) => profile.caches.historicalProvider),
       canonicalHistory: profiles.map((profile) => profile.caches.canonicalHistory),
     },
     canonicalRebuilds: profiles.filter((profile) => profile.flags.canonicalHistoryRebuilt).length,

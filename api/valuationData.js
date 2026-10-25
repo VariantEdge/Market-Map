@@ -26,6 +26,9 @@ import {
 } from '../server/valuation/issuerClassification.js'
 import { fetchWiseSheetsCanonicalRows } from '../server/valuation/wiseSheetsCanonicalShadow.js'
 import { buildWiseSheetsHistorical, completeWithSecExceptionQuarters } from '../server/valuation/wiseSheetsFinancials.js'
+import {
+  compareFiscalAdjustedEbitda, fetchFiscalAiHistorical, fiscalAdjustedEbitdaCandidates,
+} from '../server/valuation/fiscalAiFinancials.js'
 import { buildCanonicalHistoricalFinancials } from '../server/valuation/secCanonicalFinancials.js'
 import { createPerTickerCache, runAbortableTask, runBoundedTask } from '../server/valuation/interactiveCache.js'
 import {
@@ -44,7 +47,7 @@ const CONSENSUS_CACHE_TTL_MS = 30 * 60 * 1000
 const cache = new Map()
 const inFlight = new Map()
 const canonicalHistoryCache = createPerTickerCache({
-  namespace: 'canonical-history-search-completeness-v2',
+  namespace: 'canonical-history-fiscal-ai-v1',
   ttlMs: CANONICAL_CACHE_TTL_MS,
 })
 const adjustedEbitdaCache = createPerTickerCache({
@@ -54,6 +57,10 @@ const adjustedEbitdaCache = createPerTickerCache({
 })
 const wiseSheetsBatchCache = createPerTickerCache({
   namespace: 'wisesheets-batches',
+  ttlMs: CANONICAL_CACHE_TTL_MS,
+})
+const fiscalAiBatchCache = createPerTickerCache({
+  namespace: 'fiscal-ai-batches-v1',
   ttlMs: CANONICAL_CACHE_TTL_MS,
 })
 const consensusCache = createPerTickerCache({
@@ -77,6 +84,19 @@ export function createWiseSheetsBatchLoader({ cacheStore = wiseSheetsBatchCache,
 }
 
 const loadWiseSheetsBatch = createWiseSheetsBatchLoader()
+
+export function createFiscalAiBatchLoader({ cacheStore = fiscalAiBatchCache, fetchRows = fetchFiscalAiHistorical } = {}) {
+  return async (inputTickers, { refresh = false, cacheKeySuffix = '' } = {}) => {
+    const tickers = [...new Set(inputTickers.map((ticker) => String(ticker).trim().toUpperCase()).filter(Boolean))].sort()
+    const key = `${tickers.join(',')}${cacheKeySuffix}`
+    const cached = await cacheStore.get(key, () => runAbortableTask(
+      'FISCAL_AI_HISTORY', (signal) => fetchRows(tickers, { signal }), 120_000, null,
+    ), { refresh, waitForRefresh: refresh })
+    return { ...cached.value, cache: cached.cache }
+  }
+}
+
+const loadFiscalAiBatch = createFiscalAiBatchLoader()
 
 function recordLatency(profile, stage, elapsedMs, details = {}) {
   if (!profile) return
@@ -502,7 +522,8 @@ export async function loadLegacyForwardBasisProductionTask(input, dependencies =
       includeAdjustedEbitda: false,
     })
     return completeWithSecExceptionQuarters(
-      input.ticker, buildWiseSheetsHistorical(input.ticker, input.wiseSheetsRows, input.years), ledger.ledger, input.years,
+      input.ticker, buildWiseSheetsHistorical(input.ticker, input.fiscalData ? [] : input.wiseSheetsRows, input.years),
+      ledger.ledger, input.years,
     )
   }, timeoutMs)
 }
@@ -531,7 +552,9 @@ function localDateString(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows = [], options = {}) {
+export async function buildValuationRow(supabase, ticker, years, providerData = [], options = {}) {
+  const fiscalData = !Array.isArray(providerData) && providerData?.companyKey ? providerData : null
+  const wiseSheetsRows = Array.isArray(providerData) ? providerData : []
   const profile = options.latencyProfile ?? null
   if (profile) {
     profile.caches ??= {}
@@ -590,6 +613,7 @@ export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows 
           (options.canonicalHistoricalBuilder ?? buildCanonicalHistoricalFinancials)({
           ticker,
           wiseSheetsRows,
+          fiscalData,
           company,
           facts,
           filings: filingIndex,
@@ -629,7 +653,7 @@ export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows 
     : Promise.resolve({ value: null, cache: { state: 'UNAVAILABLE', ageMs: null, refreshing: false } })
   const forwardBasisPromise = company && facts && options.includeForwardBasis
     ? measureLatency(profile, 'forwardBasis', () => loadLegacyForwardBasisProductionTask({
-        ticker, company, facts, years: years.actual, filingIndex, wiseSheetsRows,
+        ticker, company, facts, years: years.actual, filingIndex, wiseSheetsRows, fiscalData,
         skipSupplemental: !operatingCompany,
         preloadedSupplemental: needsSupplemental ? supplementalPromise : undefined,
         fallbackStatus: issuerClassification.financialStatus ?? HISTORICAL_VALIDATION_STATUS.MISSING_BUT_AVAILABLE,
@@ -695,6 +719,17 @@ export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows 
     ebitda: isUsableAdjustedEbitda(auditedFinancials?.ltm?.ebitda)
       ? auditedFinancials.ltm.ebitda
       : historicalLedger?.adjustedEbitda?.ltm ?? unavailableAdjustedLtm,
+  }
+  if (fiscalData) {
+    const fiscalCandidates = fiscalAdjustedEbitdaCandidates(fiscalData)
+    const adjustedChecks = [
+      ...years.actual.map((year) => [calendarizedActuals.ebitda?.[year], `${year}-12-31`, 'Annual']),
+      [ltm.ebitda, ltm.ebitda?.ltmEnd, 'LTM'],
+    ]
+    for (const [entry, periodEnd, periodType] of adjustedChecks) {
+      const discrepancy = compareFiscalAdjustedEbitda(entry, fiscalCandidates, periodEnd, periodType)
+      if (discrepancy) sourceDiagnostics.push(discrepancy)
+    }
   }
   const freeCashFlowActuals = calendarizedActuals.freeCashFlow
   // LTM is a historical financial metric. Do not substitute a provider
@@ -908,7 +943,7 @@ export async function buildValuationRow(supabase, ticker, years, wiseSheetsRows 
     loadingSections: { adjustedEbitda: adjustedEbitdaPending, forwardBasis: !forwardBasisAvailable },
     marketTimestamp: quote?.fetchedAt ?? null,
     financialTimestamp,
-    coverage: 'Canonical WiseSheets + SEC historical GAAP actuals + SEC Adjusted EBITDA + Yahoo consensus',
+    coverage: `${fiscalData ? 'Fiscal.ai' : 'WiseSheets'} candidates + SEC historical authority + SEC Adjusted EBITDA + Yahoo consensus`,
     historicalAudit: Object.values(calendarizedActuals)
       .flatMap((byYear) => Object.values(byYear ?? {}))
       .reduce((summary, entry) => {
@@ -1113,7 +1148,10 @@ export async function getValuationRows(supabase, inputTickers = [], options = {}
       save: saveFinancialSnapshot,
     }
     const marketLoader = options.marketLoader ?? loadValuationMarketData
-    const providerLoader = options.providerLoader ?? loadWiseSheetsBatch
+    const providerMode = (options.providerMode ?? process.env.FINANCIAL_HISTORY_PROVIDER) === 'WISESHEETS'
+      ? 'WISESHEETS' : 'FISCAL_AI'
+    const providerLoader = options.providerLoader ?? (providerMode === 'WISESHEETS'
+      ? loadWiseSheetsBatch : loadFiscalAiBatch)
     const financialRowBuilder = options.financialRowBuilder ?? buildValuationRow
     const providerTickers = options.providerTickers?.length ? options.providerTickers : tickers
     const quotesPromise = measureLatency(profile, 'marketQuote', () => marketLoader(supabase, providerTickers, {
@@ -1123,19 +1161,36 @@ export async function getValuationRows(supabase, inputTickers = [], options = {}
     if (options.financialRefresh) {
       const existingResult = await measureLatency(profile, 'financialSnapshotRead', () =>
         snapshotRepository.load(supabase, tickers, { actualYears: years.actual }))
-      activity.wiseSheetsCalls += 1
-      const wiseSheetsResult = await measureLatency(profile, 'wiseSheetsAcquisition', () => providerLoader(tickers, {
+      if (providerMode === 'FISCAL_AI') activity.fiscalAiCalls = (activity.fiscalAiCalls ?? 0) + 1
+      activity.wiseSheetsCalls += providerMode === 'WISESHEETS' ? 1 : 0
+      const providerResult = await measureLatency(profile, 'historicalProviderAcquisition', () => providerLoader(tickers, {
         refresh: true,
         cacheKeySuffix: options.profileCacheKey ?? '',
       }))
-      if (profile) profile.caches.wiseSheets = wiseSheetsResult.cache?.state ?? 'UNAVAILABLE'
+      if (profile) profile.caches.historicalProvider = providerResult.cache?.state ?? 'UNAVAILABLE'
       const refreshed = new Map()
       const refreshDiagnostics = []
-      for (const ticker of tickers) {
+      const completeFiscalBatch = providerMode !== 'FISCAL_AI' ||
+        (Array.isArray(providerResult.value) && providerResult.value.length === tickers.length &&
+          new Set(providerResult.value.map((item) => item?.ticker)).size === tickers.length &&
+          tickers.every((ticker) => providerResult.value.some((item) => item?.ticker === ticker &&
+            item.companyKey && Array.isArray(item.standardizedIncome?.data) &&
+            Array.isArray(item.standardizedCashFlow?.data) && Array.isArray(item.adjustedMetrics?.data))))
+      if (providerResult.diagnostic || !Array.isArray(providerResult.value) || !completeFiscalBatch) {
+        const reason = providerResult.diagnostic?.reason ?? 'FISCAL_AI_SOURCE_UNAVAILABLE'
+        for (const ticker of tickers) {
+          refreshed.set(ticker, existingResult.snapshots.get(ticker))
+          refreshDiagnostics.push({ ticker, stage: 'HISTORICAL_PROVIDER', reason,
+            detail: providerResult.diagnostic?.detail ?? 'Financial refresh was not promoted' })
+        }
+      } else for (const ticker of tickers) {
         activity.canonicalRebuilds += 1
         activity.adjustedEbitdaRuns += 1
+        const tickerData = providerMode === 'FISCAL_AI'
+          ? providerResult.value.find((item) => item.ticker === ticker)
+          : providerResult.value.filter((item) => String(item.ticker).toUpperCase() === ticker)
         const row = await financialRowBuilder(supabase, ticker, years,
-          (wiseSheetsResult.value ?? []).filter((item) => String(item.ticker).toUpperCase() === ticker), {
+          tickerData, {
             ...options,
             refreshCanonical: true,
             includeAdjustedEbitda: true,

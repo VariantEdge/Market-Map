@@ -28,6 +28,7 @@ import {
   fetchWiseSheetsCanonicalRows,
 } from './wiseSheetsCanonicalShadow.js'
 import { buildWiseSheetsHistorical } from './wiseSheetsFinancials.js'
+import { adaptFiscalAiObservations } from './fiscalAiFinancials.js'
 import {
   getCompanyFacts,
   getCompanyFilings,
@@ -929,6 +930,62 @@ export function resolveWiseSheetsWithSecMetric(wiseObservations = [], secObserva
   }
 }
 
+// The SEC supplies exact economic boundaries and adjudicates Fiscal's selected
+// mapping. An end-only Fiscal period cannot establish a calendar year by itself.
+export function resolveFiscalAiWithSecMetric(fiscalObservations = [], secObservations = [], metric) {
+  const secOnly = resolveWiseSheetsWithSecMetric([], secObservations, metric)
+  const usedSec = new Set()
+  const comparable = (fiscal, sec) => {
+    if (fiscal.metric !== metric || sec.metric !== metric ||
+        fiscal.ticker !== sec.ticker || fiscal.currency !== sec.currency ||
+        fiscal.periodIdentity.periodEnd !== sec.periodIdentity.periodEnd) return false
+    const a = fiscal.periodIdentity
+    const b = sec.periodIdentity
+    if (a.fiscalYear != null && b.fiscalYear != null && a.fiscalYear !== b.fiscalYear) return false
+    if (a.fiscalQuarter != null && b.fiscalQuarter != null && a.fiscalQuarter !== b.fiscalQuarter) return false
+    if (a.periodType === PERIOD_TYPE.FISCAL_YEAR) {
+      return [PERIOD_TYPE.FISCAL_YEAR, PERIOD_TYPE.CALENDAR_YEAR].includes(b.periodType)
+    }
+    return a.periodType === b.periodType
+  }
+  const fiscalRecords = fiscalObservations.filter((item) => item.metric === metric).map((fiscal) => {
+    const matches = secOnly.records.filter((sec) => comparable(fiscal, sec))
+    if (matches.length !== 1 || !hasAuthoritativeBoundaries(matches[0].periodIdentity)) {
+      return { ...fiscal, deduplicationStatus: 'REQUIRES_REVIEW',
+        warnings: [...(fiscal.warnings ?? []), 'FISCAL_AI_SEC_PERIOD_UNVERIFIED'] }
+    }
+    const sec = matches[0]
+    usedSec.add(sec.sourceId)
+    const reconciles = valuesAgree(fiscal.normalizedValue, sec.normalizedValue)
+    const record = {
+      ...fiscal, issuerId: sec.issuerId, operationScope: sec.operationScope,
+      periodIdentity: sec.periodIdentity,
+      sourceUrl: reconciles ? fiscal.sourceUrl ?? sec.sourceUrl : fiscal.sourceUrl,
+      accession: reconciles ? fiscal.accession ?? sec.accession : fiscal.accession,
+      semanticDefinitionFingerprint: sec.semanticDefinitionFingerprint,
+      periodEvidenceSource: sec.sourceUrl,
+      derivation: {
+        method: 'FISCAL_AI_VALUE_WITH_SEC_PERIOD_EVIDENCE',
+        valueSource: sourceLineage(fiscal), periodEvidence: sourceLineage(sec),
+        providerMapping: fiscal.derivation,
+        reconciliation: { fiscalValue: fiscal.normalizedValue, secValue: sec.normalizedValue,
+          difference: fiscal.normalizedValue - sec.normalizedValue, tolerance: VALUE_TOLERANCE,
+          matches: reconciles },
+      },
+      warnings: [...(fiscal.warnings ?? []), reconciles
+        ? 'SEC_PERIOD_EVIDENCE_ATTACHED' : 'FISCAL_AI_SEC_VALUE_MISMATCH'],
+    }
+    return reconciles ? record : {
+      ...record, deduplicationStatus: 'REQUIRES_REVIEW',
+      conflicts: [{ type: 'VALUE_CONFLICT', sourceIds: [fiscal.sourceId, sec.sourceId],
+        values: [fiscal.normalizedValue, sec.normalizedValue] }],
+    }
+  })
+  const secValueFilled = secOnly.records.filter((sec) => !usedSec.has(sec.sourceId))
+  return { records: deduplicateEconomicPeriods([...fiscalRecords, ...secValueFilled]),
+    secValueFilled, failures: secOnly.failures }
+}
+
 export function resolveLatestReportedFinancialPeriod(metric, observations = [], filings = null, asOfDate = '9999-12-31') {
   const asOf = normalizedAsOf(asOfDate)
   const filingPeriods = (filings?.filings ?? [])
@@ -1240,6 +1297,7 @@ function applyDerivationFailures(calendarActuals, ltm, failures, years) {
 export function buildSecEnrichedFinancialsShadow({
   ticker,
   wiseSheetsRows,
+  fiscalData = null,
   company,
   facts,
   filings,
@@ -1249,14 +1307,19 @@ export function buildSecEnrichedFinancialsShadow({
   retrievedAt = null,
   sourceSearchEvidence = null,
 } = {}) {
-  const wise = adaptWiseSheetsObservations(wiseSheetsRows, { providerFrequency: 'QUARTERLY', retrievedAt })
+  const wise = fiscalData ? { observations: [], failures: [] }
+    : adaptWiseSheetsObservations(wiseSheetsRows, { providerFrequency: 'QUARTERLY', retrievedAt })
+  const fiscal = fiscalData ? adaptFiscalAiObservations(fiscalData, { retrievedAt })
+    : { observations: [], failures: [] }
   const sec = adaptSecCanonicalFinancials({ company, facts, filings, supplementalFacts, retrievedAt, asOfDate })
   const records = {}
   const latestReportedPeriods = {}
   const secValueFilled = {}
-  const failures = [...wise.failures, ...sec.failures]
+  const failures = [...wise.failures, ...fiscal.failures, ...sec.failures]
   for (const metric of ['revenue', 'grossProfit', 'ebit', 'operatingCashFlow', 'capitalExpenditures']) {
-    const resolved = resolveWiseSheetsWithSecMetric(wise.observations, sec.observations, metric)
+    const resolved = fiscalData
+      ? resolveFiscalAiWithSecMetric(fiscal.observations, sec.observations, metric)
+      : resolveWiseSheetsWithSecMetric(wise.observations, sec.observations, metric)
     records[metric] = resolved.records
     secValueFilled[metric] = resolved.secValueFilled
     latestReportedPeriods[metric] = resolveLatestReportedFinancialPeriod(metric, sec.observations, filings, asOfDate)
@@ -1318,8 +1381,10 @@ function lineageNodes(value) {
 
 function componentSignals(component) {
   const nodes = lineageNodes(component)
-  const periodEnriched = nodes.some((node) => node.sourceProvider === 'WiseSheets' &&
-    node.derivation?.method === 'WISESHEETS_VALUE_WITH_SEC_PERIOD_EVIDENCE')
+  const periodEnriched = nodes.some((node) =>
+    ['WiseSheets', 'Fiscal.ai'].includes(node.sourceProvider) &&
+    ['WISESHEETS_VALUE_WITH_SEC_PERIOD_EVIDENCE', 'FISCAL_AI_VALUE_WITH_SEC_PERIOD_EVIDENCE']
+      .includes(node.derivation?.method))
   const directAnnual = component.sourceProvider === 'SEC' &&
     component.reportedVsDerived === OBSERVATION_BASIS.REPORTED && component.totalDays >= 330
   const secValue = nodes.some((node) => node.sourceProvider === 'SEC')
@@ -1501,6 +1566,7 @@ async function loadTargetedCompletionBounded(input, loader, timeoutMs) {
 export async function buildCanonicalHistoricalFinancials({
   ticker,
   wiseSheetsRows = [],
+  fiscalData = null,
   company,
   facts,
   filings,
@@ -1518,7 +1584,7 @@ export async function buildCanonicalHistoricalFinancials({
   signal,
 }) {
   const initialCanonical = buildSecEnrichedFinancialsShadow({
-    ticker, wiseSheetsRows, company, facts, filings, years,
+    ticker, wiseSheetsRows, fiscalData, company, facts, filings, years,
     supplementalFacts: [], asOfDate, retrievedAt, sourceSearchEvidence,
   })
   const requiredPeriods = requiredSecCompletionPeriods(initialCanonical, years)
@@ -1538,7 +1604,7 @@ export async function buildCanonicalHistoricalFinancials({
     : await loadTargeted(requiredPeriods)
   let supplementalRecords = [...targeted.records, ...additionalSupplementalFacts]
   let canonical = buildSecEnrichedFinancialsShadow({
-    ticker, wiseSheetsRows, company, facts, filings, years,
+    ticker, wiseSheetsRows, fiscalData, company, facts, filings, years,
     supplementalFacts: supplementalRecords, asOfDate, retrievedAt, sourceSearchEvidence,
   })
   canonical.failures.push(...targeted.failures)
@@ -1551,7 +1617,7 @@ export async function buildCanonicalHistoricalFinancials({
       supplementalRecords = [...new Map([...supplementalRecords, ...followUp.records]
         .map((record) => [record.id, record])).values()]
       canonical = buildSecEnrichedFinancialsShadow({
-        ticker, wiseSheetsRows, company, facts, filings, years,
+        ticker, wiseSheetsRows, fiscalData, company, facts, filings, years,
         supplementalFacts: supplementalRecords, asOfDate, retrievedAt, sourceSearchEvidence,
       })
       canonical.failures.push(...targeted.failures, ...followUp.failures)

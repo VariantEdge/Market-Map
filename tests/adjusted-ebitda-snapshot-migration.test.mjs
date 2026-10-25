@@ -166,6 +166,7 @@ async function assertMigratesWithoutFinancialRefetch(rawLedger, expected) {
     marketLoader: async () => new Map([['SYNTH', {
       ticker: 'SYNTH', price: 49, previousClose: 48, currency: 'USD', fetchedAt: Date.now(),
     }]]),
+    providerMode: 'WISESHEETS',
     providerLoader: async () => { providerCalls += 1; return { value: [] } },
     financialRowBuilder: async () => { rebuilds += 1; throw new Error('Unexpected financial rebuild') },
     activityCounters,
@@ -290,6 +291,7 @@ test('controlled refresh replaces a legacy LTM N/A once, stamps the domain versi
         financialRefresh: true,
         snapshotRepository: repository,
         marketLoader,
+        providerMode: 'WISESHEETS',
         providerLoader: async () => { providerCalls += 1; return { value: [] } },
         financialRowBuilder: async () => structuredClone(fresh),
         profileCacheKey: `legacy-null-refresh-${Date.now()}-${Math.random()}`,

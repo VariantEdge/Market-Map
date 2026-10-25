@@ -28,8 +28,8 @@ async function walk(directory) {
 let failed = false
 for (const file of await walk(join(ROOT, 'src'))) {
   const source = await readFile(file, 'utf8')
-  if (/SUPABASE_SERVICE_ROLE_KEY|VITE_SUPABASE_SERVICE_ROLE_KEY/.test(source)) {
-    console.error(`${relative(ROOT, file)}: service-role credentials must remain server-only`)
+  if (/SUPABASE_SERVICE_ROLE_KEY|VITE_SUPABASE_SERVICE_ROLE_KEY|FISCAL_API_KEY|VITE_FISCAL_API_KEY/.test(source)) {
+    console.error(`${relative(ROOT, file)}: privileged credentials must remain server-only`)
     failed = true
   }
 }
