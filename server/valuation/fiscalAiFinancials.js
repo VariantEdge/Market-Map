@@ -155,6 +155,12 @@ export function adaptFiscalAiObservations(payload, { retrievedAt = new Date().to
             reason: 'FISCAL_AI_CAPEX_PREPAYMENT_OVERLAP_REQUIRES_SEC_RECONCILIATION', components })
           continue
         }
+        if (metric === 'capitalExpenditures' && components.some((item) =>
+          /project asset expenditures?/i.test(item.metricName ?? ''))) {
+          failures.push({ ticker: payload.ticker, metric, periodEnd: period.reportDate,
+            reason: 'FISCAL_AI_CAPEX_PROJECT_ASSET_SCOPE_REQUIRES_SEC_RECONCILIATION', components })
+          continue
+        }
         const source = sourceDetails(components.flatMap((item) => item.sources))
         const currency = String(value.currency ?? components[0]?.currency ?? '').toUpperCase()
         if (!currency) {

@@ -200,6 +200,27 @@ test('IREN Capex prepayment mapping is rejected; material SEC disagreement fails
   assert.equal(2_100_418_000 - secCapex, -2_232_669_000)
 })
 
+test('mixed PP&E and project-asset cash spending does not redefine cash PP&E Capex', () => {
+  const filing = 'https://www.sec.gov/Archives/edgar/data/886128/000110465925122302/fcel-20251031x10k.htm'
+  const source = payload('FCEL', 'cash_flow_statement_purchases_of_property_plant_and_equipment',
+    -22_540_000, { reportDate: '2025-10-31', fiscalYear: 2025,
+      calcType: 'derived_lineitem', mappingType: 'composite', components: [
+        { metricName: 'Capital expenditures', value: -18_601_000, originalSourceUrl: filing },
+        { metricName: 'Project asset expenditures', value: -3_939_000, originalSourceUrl: filing },
+      ] })
+  source.companyKey = 'NASDAQ_FCEL'
+  const adapted = adaptFiscalAiObservations(source)
+  assert.equal(adapted.observations.length, 0)
+  assert.equal(adapted.failures[0].reason,
+    'FISCAL_AI_CAPEX_PROJECT_ASSET_SCOPE_REQUIRES_SEC_RECONCILIATION')
+  const sec = { ...secObservation('FCEL', 'capitalExpenditures', 18_601_000,
+    '2024-11-01', '2025-10-31', PERIOD_TYPE.FISCAL_YEAR),
+    sourceUrl: filing, accession: '0001104659-25-122302' }
+  const resolved = resolveFiscalAiWithSecMetric(adapted.observations, [sec], 'capitalExpenditures')
+  assert.equal(resolved.records[0].sourceProvider, 'SEC')
+  assert.equal(resolved.records[0].normalizedValue, 18_601_000)
+})
+
 test('generic Fiscal EBITDA does not qualify as company-defined Adjusted EBITDA', () => {
   const source = { ticker: 'AMZN', companyKey: 'NASDAQ_AMZN', adjustedMetrics: { data: [
     { periodId: 'FY25', periodType: 'Annual', reportDate: '2025-12-31',
