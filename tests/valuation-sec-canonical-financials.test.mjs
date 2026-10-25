@@ -111,7 +111,7 @@ test('four exact SEC quarters produce exact calendar-year and LTM EBIT', () => {
   assert.equal(result.ltm.ebit.status, HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED)
 })
 
-test('off-calendar reported quarters produce calendarized-estimate EBIT', () => {
+test('off-calendar reported quarters remain unresolved without exact Jan–Dec EBIT', () => {
   const facts = factsByConcept({
     OperatingIncomeLoss: [
       fact('2023-11-01', '2024-01-31', 10, { fp: 'Q1', fy: 2024, filed: '2024-03-01' }),
@@ -126,8 +126,9 @@ test('off-calendar reported quarters produce calendarized-estimate EBIT', () => 
     wiseSheetsRows: [], years: [2024], asOfDate: '2025-03-15',
   })
   assert.equal(result.calendarActuals.ebit[2024].classification, CY_CLASSIFICATION.CALENDARIZED_ESTIMATE)
-  assert.equal(result.calendarActuals.ebit[2024].status, HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED)
-  assert.ok(result.calendarActuals.ebit[2024].value > 0)
+  assert.equal(result.calendarActuals.ebit[2024].status, HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE)
+  assert.equal(result.calendarActuals.ebit[2024].reason, 'PARTIAL_FISCAL_PERIOD_ALLOCATION_PROHIBITED')
+  assert.equal(result.calendarActuals.ebit[2024].value, null)
 })
 
 test('incomplete EBIT quarter coverage fails closed and targets its missing period', () => {
@@ -1363,7 +1364,7 @@ test('metric freshness is independent and stale LTM fails closed', () => {
   assert.equal(result.ltm.revenue.latestReportedPeriod.periodEnd, '2026-06-30')
 })
 
-test('off-calendar CFO uses CALENDARIZED_ESTIMATE and never fiscal-year substitution', () => {
+test('off-calendar CFO retains allocation diagnostics but not a verified actual', () => {
   const periods = [
     ['2023-11-01', '2024-01-31', 10, 2024, 'Q1'],
     ['2024-02-01', '2024-04-30', 20, 2024, 'Q2'],
@@ -1379,6 +1380,9 @@ test('off-calendar CFO uses CALENDARIZED_ESTIMATE and never fiscal-year substitu
     ticker: company.ticker, company, facts, filings: null, wiseSheetsRows: [], years: [2024], asOfDate: '2025-06-01',
   })
   assert.equal(result.calendarActuals.operatingCashFlow[2024].classification, CY_CLASSIFICATION.CALENDARIZED_ESTIMATE)
+  assert.equal(result.calendarActuals.operatingCashFlow[2024].status,
+    HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE)
+  assert.equal(result.calendarActuals.operatingCashFlow[2024].value, null)
 })
 
 test('economic sanity rejects materially impossible Gross Profit without discarding the rejected value', () => {

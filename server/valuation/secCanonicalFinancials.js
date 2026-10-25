@@ -19,6 +19,7 @@ import {
   buildCalendarYear,
   buildLtm,
   createLatestReportedPeriod,
+  CY_CLASSIFICATION,
   HISTORICAL_RESULT_STATUS,
 } from './historicalPeriodEngine.js'
 import {
@@ -1342,9 +1343,18 @@ export function buildSecEnrichedFinancialsShadow({
     .sort((left, right) => left.periodEnd.localeCompare(right.periodEnd))[0] ?? createLatestReportedPeriod({})
 
   const calendarActuals = Object.fromEntries(SEC_CANONICAL_METRICS.map((metric) => [metric,
-    Object.fromEntries(years.map((year) => [year, buildCalendarYear(records[metric], year, {
-      sourceSearchCompleteness: sourceSearchEvidence?.metricYearEvidence?.[metric]?.[year] ?? null,
-    })])),
+    Object.fromEntries(years.map((year) => {
+      const result = buildCalendarYear(records[metric], year, {
+        sourceSearchCompleteness: sourceSearchEvidence?.metricYearEvidence?.[metric]?.[year] ?? null,
+      })
+      // The general period engine can describe an allocated fiscal-quarter
+      // estimate, but production historical actuals require exact Jan–Dec
+      // boundaries. Keep the source components for diagnostics and fail closed.
+      return [year, result.classification === CY_CLASSIFICATION.CALENDARIZED_ESTIMATE
+        ? { ...result, value: null, status: HISTORICAL_RESULT_STATUS.INSUFFICIENT_PERIOD_COVERAGE,
+          reason: 'PARTIAL_FISCAL_PERIOD_ALLOCATION_PROHIBITED' }
+        : result]
+    })),
   ]))
   const ltm = Object.fromEntries(SEC_CANONICAL_METRICS.map((metric) => [metric,
     buildLtm(records[metric], { asOfDate, latestReportedPeriod: latestReportedPeriods[metric] }),
