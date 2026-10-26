@@ -28,6 +28,15 @@ test('public audit does not redistribute bulk Fiscal.ai candidate values or cred
   assert.doesNotMatch(serialized, /fiscalValue|originalSourceUrl|rawProviderPayload/)
 })
 
+test('public report preserves the original 50 unresolved cells and 69 provider conflicts', () => {
+  const previous = report.reviewBranchPreviousAudit
+  assert.equal(previous.originalUnresolvedCells.length, 50)
+  assert.equal(previous.originalProviderMismatches.length, 69)
+  assert.equal(previous.originalProviderMismatches.filter((row) =>
+    row.latestDisposition === 'STILL_FLAGGED').length, 36)
+  assert.ok(previous.originalProviderMismatches.every((row) => row.providerValueUsd === null))
+})
+
 test('unresolved and accepted N/A classifications stay distinct', () => {
   const unresolved = new Set(report.unresolvedCells.map(cellKey))
   const accepted = new Set(report.acceptedNaCells.map(cellKey))

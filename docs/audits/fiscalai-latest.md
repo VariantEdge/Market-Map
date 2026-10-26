@@ -19,7 +19,7 @@ This is a review branch. The audit **fails**; these results must not be promoted
 
 | Check | Result |
 | --- | --- |
-| npm test | 497 passed, 0 failed |
+| npm test | 498 passed, 0 failed |
 | npm run lint | Passed |
 | npm run typecheck | Passed |
 | npm run build | Passed |
@@ -63,6 +63,63 @@ The generic Capex mapping correction resolved FCEL LTM cash Capex and FCF from e
 | MU | operatingCashFlow | 2023A | VERIFIED_DERIVED | 2,319,186,813.187 | INSUFFICIENT_PERIOD_COVERAGE | N/A | WITHDRAWN_NON_EXACT_VALUE |
 | MU | operatingCashFlow | 2024A | VERIFIED_DERIVED | 11,364,252,747.253 | INSUFFICIENT_PERIOD_COVERAGE | N/A | WITHDRAWN_NON_EXACT_VALUE |
 | MU | operatingCashFlow | 2025A | VERIFIED_DERIVED | 25,709,758,241.758 | INSUFFICIENT_PERIOD_COVERAGE | N/A | WITHDRAWN_NON_EXACT_VALUE |
+
+### Original 50 unresolved cells
+
+These are retained as the historical first-published audit state. Their latest dispositions appear in the change table above and in the current 336-cell table below.
+
+| Ticker | Metric | Period | Original status | Original root cause |
+| --- | --- | --- | --- | --- |
+| FCEL | capitalExpenditures | 2023A | REQUIRES_REVIEW | Restated or conflicting SEC fact |
+| FCEL | capitalExpenditures | 2024A | REQUIRES_REVIEW | Restated or conflicting SEC fact |
+| FCEL | capitalExpenditures | 2025A | REQUIRES_REVIEW | Restated or conflicting SEC fact |
+| FCEL | capitalExpenditures | LTM | REQUIRES_REVIEW | Restated or conflicting SEC fact |
+| FCEL | freeCashFlow | 2023A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| FCEL | freeCashFlow | 2024A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| FCEL | freeCashFlow | 2025A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| FCEL | adjustedEbitda | 2023A | INSUFFICIENT_PERIOD_COVERAGE | Four exact company-defined quarters are unavailable |
+| FCEL | adjustedEbitda | 2024A | INSUFFICIENT_PERIOD_COVERAGE | Four exact company-defined quarters are unavailable |
+| FCEL | adjustedEbitda | 2025A | INSUFFICIENT_PERIOD_COVERAGE | Four exact company-defined quarters are unavailable |
+| INTC | adjustedEbitda | 2023A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| INTC | adjustedEbitda | 2024A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| INTC | adjustedEbitda | 2025A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| INTC | adjustedEbitda | LTM | MISSING_SOURCE_DATA | Unavailable source coverage |
+| MU | capitalExpenditures | 2023A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| MU | capitalExpenditures | 2024A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| MU | capitalExpenditures | 2025A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| MU | freeCashFlow | 2023A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| MU | freeCashFlow | 2024A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| MU | freeCashFlow | 2025A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| MU | adjustedEbitda | 2023A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| MU | adjustedEbitda | 2024A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| MU | adjustedEbitda | 2025A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| MU | adjustedEbitda | LTM | MISSING_SOURCE_DATA | Unavailable source coverage |
+| NBIS | operatingCashFlow | 2025A | REQUIRES_REVIEW | Restated or conflicting SEC fact |
+| NBIS | operatingCashFlow | LTM | REQUIRES_REVIEW | Restated or conflicting SEC fact |
+| CRWV | grossProfit | 2023A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| CRWV | adjustedEbitda | 2023A | INSUFFICIENT_PERIOD_COVERAGE | Four exact company-defined quarters are unavailable |
+| IREN | grossProfit | 2023A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| IREN | grossProfit | 2024A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| IREN | adjustedEbitda | 2023A | INSUFFICIENT_PERIOD_COVERAGE | Four exact company-defined quarters are unavailable |
+| IREN | adjustedEbitda | 2024A | INSUFFICIENT_PERIOD_COVERAGE | Four exact company-defined quarters are unavailable |
+| IREN | adjustedEbitda | 2025A | INSUFFICIENT_PERIOD_COVERAGE | Four exact company-defined quarters are unavailable |
+| GOOGL | adjustedEbitda | 2023A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| GOOGL | adjustedEbitda | 2024A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| GOOGL | adjustedEbitda | 2025A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| GOOGL | adjustedEbitda | LTM | MISSING_SOURCE_DATA | Unavailable source coverage |
+| AMZN | grossProfit | 2023A | INSUFFICIENT_PERIOD_COVERAGE | Unavailable source coverage |
+| AMZN | adjustedEbitda | 2023A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| AMZN | adjustedEbitda | 2024A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| AMZN | adjustedEbitda | 2025A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| AMZN | adjustedEbitda | LTM | MISSING_SOURCE_DATA | Unavailable source coverage |
+| META | adjustedEbitda | 2023A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| META | adjustedEbitda | 2024A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| META | adjustedEbitda | 2025A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| META | adjustedEbitda | LTM | MISSING_SOURCE_DATA | Unavailable source coverage |
+| MSFT | adjustedEbitda | 2023A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| MSFT | adjustedEbitda | 2024A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| MSFT | adjustedEbitda | 2025A | MISSING_SOURCE_DATA | Four exact company-defined quarters are unavailable |
+| MSFT | adjustedEbitda | LTM | MISSING_SOURCE_DATA | Unavailable source coverage |
 
 ## Nine originally unresolved MU/IREN cells
 
@@ -306,6 +363,82 @@ The exact bulk Fiscal.ai candidate values are withheld from this **public** repo
 | M036 | AMZN | grossProfit | 2022-12-31 | -3,123,000,000 | [0001018724-24-000008](https://www.sec.gov/Archives/edgar/data/1018724/000101872424000008/amzn-20231231.htm) | Provider candidate and SEC source differ for this economic period; mapping, recast, and scope require adjudication. |
 
 Two permanent regression fixtures show the material behavior: GEV Fiscal.ai LTM Adjusted EBITDA 4.157B versus SEC-supported 4.115B, a 42M difference; IREN Fiscal.ai FY2026 cash Capex 4.433391B includes 100.304M of prepayments versus SEC-supported 4.333087B cash Capex. Both provider values were already supplied for these narrowly scoped regression tests; no full statement export is published.
+
+### Original 69 provider/SEC observation mismatches
+
+This preserves every initially identified conflict for independent review. “No longer flagged” means the latest candidate mapping no longer produces that conflict; it does not imply the original Fiscal.ai observation was corrected by the provider.
+
+| ID | Ticker | Metric | Economic end | SEC USD | SEC filing | Current disposition |
+| --- | --- | --- | --- | ---: | --- | --- |
+| M001 | GEV | adjustedEbitda | 2026-06-30 | 4,115,000,000 | [0001996810-26-000147](https://www.sec.gov/Archives/edgar/data/1996810/000199681026000147/gevpressrelease2q26.htm) | STILL_FLAGGED |
+| M002 | FCEL | capitalExpenditures | 2022-01-31 | 5,331,000 | [0001558370-23-003256](https://www.sec.gov/Archives/edgar/data/886128/000155837023003256/fcel-20230131x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M003 | FCEL | capitalExpenditures | 2022-04-30 | 5,064,000 | [0001558370-23-010890](https://www.sec.gov/Archives/edgar/data/886128/000155837023010890/fcel-20230430x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M004 | FCEL | capitalExpenditures | 2022-04-30 | 10,395,000 | [0001558370-23-010890](https://www.sec.gov/Archives/edgar/data/886128/000155837023010890/fcel-20230430x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M005 | FCEL | capitalExpenditures | 2022-07-31 | 5,395,000 | [0001558370-23-015619](https://www.sec.gov/Archives/edgar/data/886128/000155837023015619/fcel-20230731x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M006 | FCEL | capitalExpenditures | 2022-07-31 | 15,790,000 | [0001558370-23-015619](https://www.sec.gov/Archives/edgar/data/886128/000155837023015619/fcel-20230731x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M007 | FCEL | capitalExpenditures | 2022-10-31 | 5,288,000 | [0001558370-24-016497](https://www.sec.gov/Archives/edgar/data/886128/000155837024016497/fcel-20241031x10k.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M008 | FCEL | capitalExpenditures | 2022-10-31 | 21,078,000 | [0001558370-24-016497](https://www.sec.gov/Archives/edgar/data/886128/000155837024016497/fcel-20241031x10k.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M009 | FCEL | capitalExpenditures | 2023-01-31 | 7,765,000 | [0001558370-24-002673](https://www.sec.gov/Archives/edgar/data/886128/000155837024002673/fcel-20240131x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M010 | FCEL | capitalExpenditures | 2023-04-30 | 9,138,000 | [0001558370-24-009026](https://www.sec.gov/Archives/edgar/data/886128/000155837024009026/fcel-20240430x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M011 | FCEL | capitalExpenditures | 2023-04-30 | 16,903,000 | [0001558370-24-009026](https://www.sec.gov/Archives/edgar/data/886128/000155837024009026/fcel-20240430x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M012 | FCEL | capitalExpenditures | 2023-07-31 | 11,199,000 | [0001558370-24-012598](https://www.sec.gov/Archives/edgar/data/886128/000155837024012598/fcel-20240731x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M013 | FCEL | capitalExpenditures | 2023-07-31 | 28,102,000 | [0001558370-24-012598](https://www.sec.gov/Archives/edgar/data/886128/000155837024012598/fcel-20240731x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M014 | FCEL | capitalExpenditures | 2023-10-31 | 11,253,000 | [0001104659-25-122302](https://www.sec.gov/Archives/edgar/data/886128/000110465925122302/fcel-20251031x10k.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M015 | FCEL | capitalExpenditures | 2023-10-31 | 39,355,000 | [0001104659-25-122302](https://www.sec.gov/Archives/edgar/data/886128/000110465925122302/fcel-20251031x10k.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M016 | FCEL | capitalExpenditures | 2024-01-31 | 10,565,000 | [0001558370-25-002637](https://www.sec.gov/Archives/edgar/data/886128/000155837025002637/fcel-20250131x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M017 | FCEL | capitalExpenditures | 2024-04-30 | 13,208,000 | [0001558370-25-008463](https://www.sec.gov/Archives/edgar/data/886128/000155837025008463/fcel-20250430x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M018 | FCEL | capitalExpenditures | 2024-04-30 | 23,773,000 | [0001558370-25-008463](https://www.sec.gov/Archives/edgar/data/886128/000155837025008463/fcel-20250430x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M019 | FCEL | capitalExpenditures | 2024-07-31 | 13,403,000 | [0001558370-25-011952](https://www.sec.gov/Archives/edgar/data/886128/000155837025011952/fcel-20250731x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M020 | FCEL | capitalExpenditures | 2024-07-31 | 37,176,000 | [0001558370-25-011952](https://www.sec.gov/Archives/edgar/data/886128/000155837025011952/fcel-20250731x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M021 | FCEL | capitalExpenditures | 2024-10-31 | 10,545,000 | [0001104659-25-122302](https://www.sec.gov/Archives/edgar/data/886128/000110465925122302/fcel-20251031x10k.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M022 | FCEL | capitalExpenditures | 2024-10-31 | 47,721,000 | [0001104659-25-122302](https://www.sec.gov/Archives/edgar/data/886128/000110465925122302/fcel-20251031x10k.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M023 | FCEL | capitalExpenditures | 2025-01-31 | 7,060,000 | [0001104659-26-024970](https://www.sec.gov/Archives/edgar/data/886128/000110465926024970/fcel-20260131x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M024 | FCEL | capitalExpenditures | 2025-04-30 | 5,281,000 | [0001104659-26-071183](https://www.sec.gov/Archives/edgar/data/886128/000110465926071183/fcel-20260430x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M025 | FCEL | capitalExpenditures | 2025-04-30 | 12,341,000 | [0001104659-26-071183](https://www.sec.gov/Archives/edgar/data/886128/000110465926071183/fcel-20260430x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M026 | FCEL | capitalExpenditures | 2025-07-31 | 5,245,000 | [0001104659-26-104501](https://www.sec.gov/Archives/edgar/data/886128/000110465926104501/fcel-20260731x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M027 | FCEL | capitalExpenditures | 2025-07-31 | 17,586,000 | [0001104659-26-104501](https://www.sec.gov/Archives/edgar/data/886128/000110465926104501/fcel-20260731x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M028 | FCEL | capitalExpenditures | 2025-10-31 | 1,015,000 | [0001104659-25-122302](https://www.sec.gov/Archives/edgar/data/886128/000110465925122302/fcel-20251031x10k.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M029 | FCEL | capitalExpenditures | 2025-10-31 | 18,601,000 | [0001104659-25-122302](https://www.sec.gov/Archives/edgar/data/886128/000110465925122302/fcel-20251031x10k.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M030 | FCEL | capitalExpenditures | 2026-01-31 | 773,000 | [0001104659-26-024970](https://www.sec.gov/Archives/edgar/data/886128/000110465926024970/fcel-20260131x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M031 | FCEL | capitalExpenditures | 2026-04-30 | 1,704,000 | [0001104659-26-071183](https://www.sec.gov/Archives/edgar/data/886128/000110465926071183/fcel-20260430x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M032 | FCEL | capitalExpenditures | 2026-04-30 | 2,477,000 | [0001104659-26-071183](https://www.sec.gov/Archives/edgar/data/886128/000110465926071183/fcel-20260430x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M033 | FCEL | capitalExpenditures | 2026-07-31 | 1,322,000 | [0001104659-26-104501](https://www.sec.gov/Archives/edgar/data/886128/000110465926104501/fcel-20260731x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M034 | FCEL | capitalExpenditures | 2026-07-31 | 3,799,000 | [0001104659-26-104501](https://www.sec.gov/Archives/edgar/data/886128/000110465926104501/fcel-20260731x10q.htm) | NO_LONGER_FLAGGED_AFTER_MAPPING_FIX |
+| M035 | INTC | revenue | 2022-07-02 | 24,664,000,000 | [0000050863-24-000124](https://www.sec.gov/Archives/edgar/data/50863/000005086324000124/intc-20240629.htm) | STILL_FLAGGED |
+| M036 | INTC | ebit | 2022-07-02 | -2,484,000,000 | [0000050863-24-000124](https://www.sec.gov/Archives/edgar/data/50863/000005086324000124/intc-20240629.htm) | STILL_FLAGGED |
+| M037 | NBIS | revenue | 2023-03-31 | 163,275 | [0001513845-24-000012](https://www.sec.gov/Archives/edgar/data/1513845/000151384524000012/yndx-20240331xex99d1.htm) | STILL_FLAGGED |
+| M038 | NBIS | revenue | 2023-12-31 | 6,700,000 | [0001104659-25-015480](https://www.sec.gov/Archives/edgar/data/1513845/000110465925015480/tm257185d1_ex99-1.htm) | STILL_FLAGGED |
+| M039 | NBIS | revenue | 2024-03-31 | 229,359 | [0001513845-24-000012](https://www.sec.gov/Archives/edgar/data/1513845/000151384524000012/yndx-20240331xex99d1.htm) | STILL_FLAGGED |
+| M040 | NBIS | grossProfit | 2023-12-31 | -3,100,000 | [0001104659-25-015480](https://www.sec.gov/Archives/edgar/data/1513845/000110465925015480/tm257185d1_ex99-1.htm) | STILL_FLAGGED |
+| M041 | NBIS | ebit | 2023-03-31 | 1,970 | [0001513845-24-000012](https://www.sec.gov/Archives/edgar/data/1513845/000151384524000012/yndx-20240331xex99d1.htm) | STILL_FLAGGED |
+| M042 | NBIS | ebit | 2023-12-31 | -93,500,000 | [0001104659-25-015480](https://www.sec.gov/Archives/edgar/data/1513845/000110465925015480/tm257185d1_ex99-1.htm) | STILL_FLAGGED |
+| M043 | NBIS | ebit | 2024-03-31 | 15,766 | [0001513845-24-000012](https://www.sec.gov/Archives/edgar/data/1513845/000151384524000012/yndx-20240331xex99d1.htm) | STILL_FLAGGED |
+| M044 | NBIS | ebit | 2025-12-31 | -250,000,000 | [0001104659-26-052948](https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm) | STILL_FLAGGED |
+| M045 | NBIS | operatingCashFlow | 2024-09-30 | -196,800,000 | [0001104659-25-110831](https://www.sec.gov/Archives/edgar/data/1513845/000110465925110831/tm2531034d1_ex99-1.htm) | STILL_FLAGGED |
+| M046 | NBIS | operatingCashFlow | 2025-03-31 | -184,100,000 | [0001104659-26-064092](https://www.sec.gov/Archives/edgar/data/1513845/000110465926064092/nbis-20260331xex99d1.htm) | STILL_FLAGGED |
+| M047 | NBIS | operatingCashFlow | 2025-06-30 | -167,900,000 | [0001104659-26-094844](https://www.sec.gov/Archives/edgar/data/1513845/000110465926094844/nbis-20260812xex99d1.htm) | STILL_FLAGGED |
+| M048 | NBIS | operatingCashFlow | 2025-06-30 | -352,000,000 | [0001104659-26-094844](https://www.sec.gov/Archives/edgar/data/1513845/000110465926094844/nbis-20260812xex99d1.htm) | STILL_FLAGGED |
+| M049 | NBIS | operatingCashFlow | 2025-09-30 | -80,400,000 | [0001104659-25-110831](https://www.sec.gov/Archives/edgar/data/1513845/000110465925110831/tm2531034d1_ex99-1.htm) | STILL_FLAGGED |
+| M050 | NBIS | operatingCashFlow | 2025-09-30 | -432,400,000 | [0001104659-25-110831](https://www.sec.gov/Archives/edgar/data/1513845/000110465925110831/tm2531034d1_ex99-1.htm) | STILL_FLAGGED |
+| M051 | NBIS | operatingCashFlow | 2025-12-31 | 401,900,000 | [0001104659-26-052948](https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm) | STILL_FLAGGED |
+| M052 | CRWV | ebit | 2024-12-31 | 112,316,000 | [0001769628-26-000104](https://www.sec.gov/Archives/edgar/data/1769628/000176962826000104/crwv-20251231.htm) | STILL_FLAGGED |
+| M053 | IREN | revenue | 2023-03-31 | 16,382,000 | [0001140361-24-026268](https://www.sec.gov/Archives/edgar/data/1878848/000114036124026268/ef20027345_6k.htm) | STILL_FLAGGED |
+| M054 | IREN | revenue | 2023-03-31 | 47,668,000 | [0001140361-24-026268](https://www.sec.gov/Archives/edgar/data/1878848/000114036124026268/ef20027345_6k.htm) | STILL_FLAGGED |
+| M055 | IREN | revenue | 2023-06-30 | 27,841,000 | [0001878848-25-000063](https://www.sec.gov/Archives/edgar/data/1878848/000187884825000063/iren-20250630.htm) | STILL_FLAGGED |
+| M056 | IREN | revenue | 2023-12-31 | 42,574,000 | [0001140361-24-008183](https://www.sec.gov/Archives/edgar/data/1878848/000114036124008183/ef20015356_6k.htm) | STILL_FLAGGED |
+| M057 | IREN | revenue | 2024-06-30 | 55,872,000 | [0001878848-26-000052](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000052/iren-20260630.htm) | STILL_FLAGGED |
+| M058 | IREN | ebit | 2023-12-31 | -2,221,000 | [0001878848-25-000025](https://data.sec.gov/api/xbrl/companyfacts/CIK0001878848.json) | STILL_FLAGGED |
+| M059 | IREN | ebit | 2024-06-30 | -23,620,000 | [0001878848-26-000052](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000052/iren-20260630.htm) | STILL_FLAGGED |
+| M060 | IREN | ebit | 2025-06-30 | 17,888,000 | [0001878848-26-000052](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000052/iren-20260630.htm) | STILL_FLAGGED |
+| M061 | IREN | operatingCashFlow | 2023-06-30 | 6,727,000 | [0001878848-25-000063](https://www.sec.gov/Archives/edgar/data/1878848/000187884825000063/iren-20250630.htm) | STILL_FLAGGED |
+| M062 | IREN | operatingCashFlow | 2023-09-30 | -30,269,000 | [0001878848-25-000023](https://data.sec.gov/api/xbrl/companyfacts/CIK0001878848.json) | STILL_FLAGGED |
+| M063 | IREN | operatingCashFlow | 2024-03-31 | -27,071,000 | [0001878848-25-000043](https://www.sec.gov/Archives/edgar/data/1878848/000187884825000043/iren-20250331.htm) | STILL_FLAGGED |
+| M064 | IREN | operatingCashFlow | 2024-03-31 | -81,505,000 | [0001878848-25-000043](https://www.sec.gov/Archives/edgar/data/1878848/000187884825000043/iren-20250331.htm) | STILL_FLAGGED |
+| M065 | IREN | operatingCashFlow | 2024-06-30 | 133,724,000 | [0001878848-26-000052](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000052/iren-20260630.htm) | STILL_FLAGGED |
+| M066 | IREN | operatingCashFlow | 2024-12-31 | 53,556,000 | [0001878848-26-000015](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000015/iren-20251231.htm) | STILL_FLAGGED |
+| M067 | IREN | operatingCashFlow | 2025-03-31 | 93,104,000 | [0001878848-26-000026](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000026/iren-20260331.htm) | STILL_FLAGGED |
+| M068 | IREN | operatingCashFlow | 2025-06-30 | 103,141,000 | [0001878848-26-000052](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000052/iren-20260630.htm) | STILL_FLAGGED |
+| M069 | AMZN | grossProfit | 2022-12-31 | -3,123,000,000 | [0001018724-24-000008](https://www.sec.gov/Archives/edgar/data/1018724/000101872424000008/amzn-20231231.htm) | STILL_FLAGGED |
 
 ## All 336 classified cells
 

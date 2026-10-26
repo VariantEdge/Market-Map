@@ -142,7 +142,7 @@ const branchChanges = priorFiscal ? cells.flatMap((cell) => {
         ? 'WITHDRAWN_NON_EXACT_VALUE'
         : 'CHANGED_STATUS_OR_VALUE' }]
 }) : []
-const providerMismatches = latest.fiscalAiDiscrepancies.map((item, index) => {
+const sanitizeProviderMismatch = (item, index) => {
   const sec = item.secSource ?? {}
   const fiscal = item.fiscalSource ?? {}
   const secUrl = isSecUrl(sec.sourceUrl) ? sec.sourceUrl : null
@@ -170,7 +170,33 @@ const providerMismatches = latest.fiscalAiDiscrepancies.map((item, index) => {
         ? 'Fiscal.ai LTM Adjusted EBITDA differs from the precise SEC reconciliation; SEC remains authoritative.'
         : 'Provider candidate and SEC source differ for this economic period; mapping, recast, and scope require adjudication.',
   }
-})
+}
+const providerMismatches = latest.fiscalAiDiscrepancies.map(sanitizeProviderMismatch)
+const originalProviderMismatches = (priorFiscal?.fiscalAiDiscrepancies ?? []).map(sanitizeProviderMismatch)
+const mismatchKey = (item) => JSON.stringify([
+  item.ticker, item.metric, item.period, item.periodStart, item.periodEnd,
+  item.secValueUsd, item.providerObservationId, item.secSource.accession,
+])
+const latestMismatchCounts = new Map()
+for (const item of providerMismatches) {
+  const key = mismatchKey(item)
+  latestMismatchCounts.set(key, (latestMismatchCounts.get(key) ?? 0) + 1)
+}
+for (const item of originalProviderMismatches) {
+  const key = mismatchKey(item)
+  const remaining = latestMismatchCounts.get(key) ?? 0
+  item.latestDisposition = remaining > 0 ? 'STILL_FLAGGED' : 'NO_LONGER_FLAGGED_AFTER_MAPPING_FIX'
+  if (remaining > 0) latestMismatchCounts.set(key, remaining - 1)
+}
+const originalUnresolvedKeys = new Set((priorFiscal?.auditIssues ?? []).map((issue) =>
+  `${issue.ticker}|${issue.metric}|${issue.period}`))
+const originalUnresolvedCells = (priorFiscal?.records ?? [])
+  .filter((record) => originalUnresolvedKeys.has(cellKey(record)))
+  .map((record) => ({ ticker: record.ticker, metric: record.metric,
+    period: record.calendarYear, status: record.validationStatus,
+    rootCause: record.failureReason ?? null, warning: record.warning ?? null,
+    sources: (record.quarterlyComponents ?? []).map((component) =>
+      sourceReference(component, record.validationStatus)) }))
 const report = {
   schemaVersion: 1,
   repository: 'VariantEdge/Market-Map', branch: 'review/fiscalai-migration',
@@ -189,6 +215,8 @@ const report = {
     generatedAt: priorFiscal.generatedAt, summary: priorFiscal.summary,
     changes: branchChanges,
     conflictCountChange: latest.fiscalAiDiscrepancies.length - priorFiscal.fiscalAiDiscrepancies.length,
+    originalUnresolvedCells,
+    originalProviderMismatches,
   } : null,
   cells, unresolvedCells, unresolvedByRootCause, acceptedNaCells, providerMismatches,
 }
@@ -226,6 +254,12 @@ add('# Fiscal.ai migration — independent review audit', '',
     '| Ticker | Metric | Period | Before status | Before USD | Current status | Current USD | Assessment |',
     '| --- | --- | --- | --- | ---: | --- | ---: | --- |',
     ...branchChanges.map((change) => `| ${change.ticker} | ${change.metric} | ${change.period} | ${change.beforeStatus} | ${fmt(change.beforeValueUsd)} | ${change.afterStatus} | ${fmt(change.afterValueUsd)} | ${change.assessment} |`),
+    '',
+    `### Original ${originalUnresolvedCells.length} unresolved cells`, '',
+    'These are retained as the historical first-published audit state. Their latest dispositions appear in the change table above and in the current 336-cell table below.', '',
+    '| Ticker | Metric | Period | Original status | Original root cause |',
+    '| --- | --- | --- | --- | --- |',
+    ...originalUnresolvedCells.map((cell) => `| ${cell.ticker} | ${cell.metric} | ${cell.period} | ${cell.status} | ${escapeTable(cell.rootCause)} |`),
     '',
   ] : []),
   '## Nine originally unresolved MU/IREN cells', '',
@@ -287,6 +321,14 @@ add('', `## Fiscal.ai-versus-SEC mismatches — all ${providerMismatches.length}
   '| --- | --- | --- | --- | ---: | --- | --- |')
 for (const mismatch of providerMismatches) add(`| ${mismatch.id} | ${mismatch.ticker} | ${mismatch.metric} | ${mismatch.periodEnd ?? mismatch.period ?? 'N/A'} | ${fmt(mismatch.secValueUsd)} | ${mismatch.secSource.filingUrl ? `[${mismatch.secSource.accession ?? 'SEC'}](${mismatch.secSource.filingUrl})` : 'Source in local audit'} | ${escapeTable(mismatch.explanation)} |`)
 add('', 'Two permanent regression fixtures show the material behavior: GEV Fiscal.ai LTM Adjusted EBITDA 4.157B versus SEC-supported 4.115B, a 42M difference; IREN Fiscal.ai FY2026 cash Capex 4.433391B includes 100.304M of prepayments versus SEC-supported 4.333087B cash Capex. Both provider values were already supplied for these narrowly scoped regression tests; no full statement export is published.', '',
+  ...(priorFiscal ? [
+    `### Original ${originalProviderMismatches.length} provider/SEC observation mismatches`, '',
+    'This preserves every initially identified conflict for independent review. “No longer flagged” means the latest candidate mapping no longer produces that conflict; it does not imply the original Fiscal.ai observation was corrected by the provider.', '',
+    '| ID | Ticker | Metric | Economic end | SEC USD | SEC filing | Current disposition |',
+    '| --- | --- | --- | --- | ---: | --- | --- |',
+    ...originalProviderMismatches.map((mismatch) => `| ${mismatch.id} | ${mismatch.ticker} | ${mismatch.metric} | ${mismatch.periodEnd ?? mismatch.period ?? 'N/A'} | ${fmt(mismatch.secValueUsd)} | ${mismatch.secSource.filingUrl ? `[${mismatch.secSource.accession ?? 'SEC'}](${mismatch.secSource.filingUrl})` : 'Source in local audit'} | ${mismatch.latestDisposition} |`),
+    '',
+  ] : []),
   '## All 336 classified cells', '',
   'Values are USD. The linked machine-readable file retains all public SEC source references and component periods.', '',
   '| Ticker | Metric | Period | Value | Status | Calculation | Filing references |',
