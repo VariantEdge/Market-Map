@@ -4,12 +4,13 @@ import path from 'node:path'
 // Publish SEC-backed audit conclusions without copying bulk licensed provider
 // output into this public repository. A reviewer with Fiscal.ai access can
 // re-query the indexed provider observations in the local audit run.
-const [latestPath, baselinePath, testedCommit, testCount = 'unknown'] = process.argv.slice(2)
+const [latestPath, baselinePath, testedCommit, testCount = 'unknown', priorFiscalPath] = process.argv.slice(2)
 if (!latestPath || !baselinePath || !testedCommit) {
-  throw new Error('Usage: node scripts/publish-fiscalai-audit.mjs LATEST_JSON BASELINE_JSON TESTED_COMMIT [TEST_COUNT]')
+  throw new Error('Usage: node scripts/publish-fiscalai-audit.mjs LATEST_JSON BASELINE_JSON TESTED_COMMIT [TEST_COUNT] [PRIOR_FISCAL_JSON]')
 }
 const latest = JSON.parse(await readFile(latestPath, 'utf8'))
 const baseline = JSON.parse(await readFile(baselinePath, 'utf8'))
+const priorFiscal = priorFiscalPath ? JSON.parse(await readFile(priorFiscalPath, 'utf8')) : null
 if (latest.records?.length !== 336 || !Array.isArray(latest.fiscalAiDiscrepancies)) {
   throw new Error('Expected a complete 336-cell Fiscal.ai audit with discrepancy records')
 }
@@ -80,6 +81,10 @@ const staleAcceptedNaCount = acceptedNaCells.filter((cell) =>
 const auditPassed = unresolvedCells.length === 0 && staleAcceptedNaCount === 0
 const previous = new Map(baseline.records.map((record) => [cellKey(record), record]))
 function regressionExplanation(change) {
+  if (['FCEL', 'MU'].includes(change.ticker) && change.period !== 'LTM' &&
+    ['revenue', 'grossProfit', 'ebit', 'operatingCashFlow', 'capitalExpenditures', 'freeCashFlow'].includes(change.metric)) {
+    return 'Earlier result allocated fiscal quarters across January/December boundaries; no exact Jan–Dec construction is established from the available source periods.'
+  }
   if (change.ticker === 'FCEL' && change.metric === 'capitalExpenditures' && change.period !== 'LTM') {
     return 'Prior Wise-based result allocated October fiscal quarters across Jan–Dec boundaries; current provider/SEC Capex candidates conflict. Exact value unestablished.'
   }
@@ -124,6 +129,19 @@ const improvements = comparisons.filter((change) => !verified.has(change.previou
   verified.has(change.currentStatus))
 const changedVerifiedValues = comparisons.filter((change) => verified.has(change.previousStatus) &&
   verified.has(change.currentStatus) && change.previousValueUsd !== change.currentValueUsd)
+const priorFiscalRecords = new Map((priorFiscal?.records ?? []).map((record) => [cellKey(record), record]))
+const branchChanges = priorFiscal ? cells.flatMap((cell) => {
+  const before = priorFiscalRecords.get(cellKey(cell))
+  if (!before || (before.validationStatus === cell.status && before.displayedValue === cell.valueUsd)) return []
+  return [{ ticker: cell.ticker, metric: cell.metric, period: cell.period,
+    beforeStatus: before.validationStatus, beforeValueUsd: before.displayedValue ?? null,
+    afterStatus: cell.status, afterValueUsd: cell.valueUsd,
+    assessment: !verified.has(before.validationStatus) && verified.has(cell.status)
+      ? 'IMPROVED_VERIFICATION'
+      : verified.has(before.validationStatus) && !verified.has(cell.status)
+        ? 'WITHDRAWN_NON_EXACT_VALUE'
+        : 'CHANGED_STATUS_OR_VALUE' }]
+}) : []
 const providerMismatches = latest.fiscalAiDiscrepancies.map((item, index) => {
   const sec = item.secSource ?? {}
   const fiscal = item.fiscalSource ?? {}
@@ -167,10 +185,16 @@ const report = {
   universe: { tickers: latest.tickers, metrics: latest.metrics, periods: [...latest.years.map((year) => `${year}A`), 'LTM'] },
   baseline: { generatedAt: baseline.generatedAt, summary: baseline.summary,
     regressions, improvements, changedVerifiedValues, allCellComparisons: comparisons },
+  reviewBranchPreviousAudit: priorFiscal ? {
+    generatedAt: priorFiscal.generatedAt, summary: priorFiscal.summary,
+    changes: branchChanges,
+    conflictCountChange: latest.fiscalAiDiscrepancies.length - priorFiscal.fiscalAiDiscrepancies.length,
+  } : null,
   cells, unresolvedCells, unresolvedByRootCause, acceptedNaCells, providerMismatches,
 }
 
 const fmt = (value) => value == null ? 'N/A' : Number(value).toLocaleString('en-US')
+const fmtMillions = (value) => value == null ? 'N/A' : Number(value / 1e6).toLocaleString('en-US', { maximumFractionDigits: 3 })
 const sourceLinks = (cell) => cell.sources.filter((source) => source.filingUrl)
   .slice(0, 2).map((source) => `[${source.accession ?? 'SEC'}](${source.filingUrl})`).join(', ') || 'No filing link in flattened record'
 const escapeTable = (value) => String(value ?? '').replaceAll('|', '\\|').replaceAll('\n', ' ')
@@ -195,22 +219,40 @@ add('# Fiscal.ai migration — independent review audit', '',
   `| npm run build | Passed |`,
   `| npm run financials:audit | ${auditPassed ? 'Passed' : 'Failed closed'}: ${unresolvedCells.length} unresolved / 336 |`, '',
   `The audit used ${latest.providerSource === 'FISCAL_AI_MCP_LOCAL_CAPTURE' ? 'Fiscal.ai MCP responses captured locally' : 'Fiscal.ai REST responses'} and SEC source checks. No production Fiscal.ai REST credential was available for this run. The complete local provider capture is **not** committed.`, '',
+  ...(priorFiscal ? [
+    '## Change since the previous published Fiscal.ai audit', '',
+    `The previous review-branch audit (${priorFiscal.generatedAt}) had ${priorFiscal.summary.VERIFIED_REPORTED + priorFiscal.summary.VERIFIED_DERIVED} verified, ${priorFiscal.summary.acceptedNaCellsWithEvidence} accepted N/As, ${priorFiscal.summary.unresolvedCellCount} unresolved, and ${priorFiscal.summary.fiscalAiDiscrepancyCount} underlying observation conflicts. The current run has ${latest.summary.VERIFIED_REPORTED + latest.summary.VERIFIED_DERIVED} verified, ${acceptedNaCells.length} accepted N/As, ${unresolvedCells.length} unresolved, and ${providerMismatches.length} conflicts.`,
+    'The generic Capex mapping correction resolved FCEL LTM cash Capex and FCF from exact source quarters and removed 33 mixed-project-asset observations from the provider/SEC conflict list. The exact-calendar guard withdrew 24 FCEL/MU annual values that had been prorated across calendar boundaries. These are disclosed verification regressions, not silently accepted N/As.', '',
+    '| Ticker | Metric | Period | Before status | Before USD | Current status | Current USD | Assessment |',
+    '| --- | --- | --- | --- | ---: | --- | ---: | --- |',
+    ...branchChanges.map((change) => `| ${change.ticker} | ${change.metric} | ${change.period} | ${change.beforeStatus} | ${fmt(change.beforeValueUsd)} | ${change.afterStatus} | ${fmt(change.afterValueUsd)} | ${change.assessment} |`),
+    '',
+  ] : []),
   '## Nine originally unresolved MU/IREN cells', '',
   '| Cell | Value (USD millions) | Status | SEC-supported construction or gap |',
-  '| --- | ---: | --- | --- |',
-  '| MU Capex 2023A | N/A | INSUFFICIENT_PERIOD_COVERAGE | August fiscal-year periods do not supply an exact Jan–Dec value; no proration. |',
-  '| MU Capex 2024A | N/A | INSUFFICIENT_PERIOD_COVERAGE | Same exact calendar coverage gap. |',
-  '| MU Capex 2025A | N/A | INSUFFICIENT_PERIOD_COVERAGE | Same exact calendar coverage gap. |',
-  '| IREN Gross Profit 2023A | N/A | INSUFFICIENT_PERIOD_COVERAGE | Early provider mapping lacks a valid cost component; exact SEC reconstruction is incomplete. |',
-  '| IREN Gross Profit 2024A | N/A | INSUFFICIENT_PERIOD_COVERAGE | Required compatible half-year gross-profit components remain unverified. |',
-  '| IREN Capex 2023A | 115.423 | VERIFIED_DERIVED | FY23 116.064 + H2 CY23 64.015 − H2 CY22 64.656. |',
-  '| IREN Capex 2024A | 986.845 | VERIFIED_DERIVED | FY24 479.909 + H2 CY24 570.951 − H2 CY23 64.015. |',
-  '| IREN Capex 2025A | 1,801.385 | VERIFIED_DERIVED | FY25 1,372.627 + H2 CY25 999.709 − H2 CY24 570.951. |',
-  '| IREN FCF 2023A | −157.865 | VERIFIED_DERIVED | CY23 OCF −42.442 − CY23 cash Capex 115.423. |', '',
+  '| --- | ---: | --- | --- |')
+const originalNine = [
+  ...[2023, 2024, 2025].map((year) => ['MU', 'capitalExpenditures', `${year}A`]),
+  ...[2023, 2024].map((year) => ['IREN', 'grossProfit', `${year}A`]),
+  ...[2023, 2024, 2025].map((year) => ['IREN', 'capitalExpenditures', `${year}A`]),
+  ['IREN', 'freeCashFlow', '2023A'],
+]
+for (const [ticker, metric, period] of originalNine) {
+  const cell = cells.find((row) => row.ticker === ticker && row.metric === metric && row.period === period)
+  const ocf = cells.find((row) => row.ticker === ticker && row.metric === 'operatingCashFlow' && row.period === period)
+  const capex = cells.find((row) => row.ticker === ticker && row.metric === 'capitalExpenditures' && row.period === period)
+  const sourceMath = metric === 'freeCashFlow' && cell.valueUsd != null && ocf?.valueUsd != null && capex?.valueUsd != null
+    ? `CY OCF ${fmtMillions(ocf.valueUsd)} − CY cash Capex ${fmtMillions(capex.valueUsd)}; OCF sources ${ocf.sources.map((source) => source.accession).filter(Boolean).join(', ')}; Capex sources ${capex.sources.map((source) => source.accession).filter(Boolean).join(', ')}`
+    : cell.valueUsd == null
+    ? `${escapeTable(cell.validationEvidence.rootCause ?? cell.validationEvidence.warning ?? 'Exact period source coverage unavailable')}; no proration.`
+    : `${cell.calculation ?? 'Derived'}: ${cell.sources.map((source, index) => `${index === 0 ? '' : index === 1 ? ' + ' : ' − '}${fmtMillions(source.amountUsd)} [${source.periodStart}–${source.periodEnd}; ${source.accession ?? 'accession unavailable'}]`).join('')}`
+  add(`| ${ticker} ${metric} ${period} | ${fmtMillions(cell.valueUsd)} | ${cell.status} | ${escapeTable(sourceMath)} |`)
+}
+add('',
   'IREN source accessions: [FY23 comparative 0001878848-25-000063](https://www.sec.gov/Archives/edgar/data/1878848/000187884825000063/iren-20250630.htm), [H2 CY23 0001878848-25-000009](https://www.sec.gov/Archives/edgar/data/1878848/000187884825000009/iren-20241231_d2.htm), [H2 CY22 0001140361-24-008183](https://www.sec.gov/Archives/edgar/data/1878848/000114036124008183/ef20015356_ex99-3.htm), [FY24/FY25 comparative 0001878848-26-000052](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000052/iren-20260630.htm), and [H2 CY24/CY25 0001878848-26-000015](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000015/iren-20251231.htm). MU August fiscal-year filings: [0000723125-25-000028](https://www.sec.gov/Archives/edgar/data/723125/000072312525000028/mu-20250828.htm) and [0000723125-26-000023](https://www.sec.gov/Archives/edgar/data/723125/000072312526000023/mu-20260903.htm).', '',
   '## Comparison with prior WiseSheets-based audit', '',
   `The cached ${baseline.generatedAt} WiseSheets/SEC run had ${baseline.summary.VERIFIED_REPORTED} reported, ${baseline.summary.VERIFIED_DERIVED} derived, ${baseline.summary.acceptedNaCellsWithEvidence} accepted N/As, and ${baseline.summary.unresolvedCellCount} unresolved. The current run has ${regressions.length} verified-to-nonverified transitions and ${changedVerifiedValues.length} changed verified values. Dates and newest LTM endpoints differ, so changed LTM values are not automatically provider errors. The earlier “nine unresolved” figure was a separate historical audit state; it is not this immediate baseline.`, '',
-  'At least nine prior verified FCEL/MU annual values relied on allocating fiscal quarters that cross January or December. Their loss of verification is a stricter exact-calendar result, not evidence that the new provider alone caused missing data. Other transitions still need source adjudication.', '',
+  'Prior verified FCEL/MU annual values that allocated fiscal quarters across January or December have been withdrawn. Their loss of verification enforces exact-calendar accounting; it is not evidence that the new provider alone caused missing data. Other transitions still need source adjudication.', '',
   '### Every verified-to-nonverified transition', '',
   '| Ticker | Metric | Period | Previous | Current | Explanation |', '| --- | --- | --- | ---: | --- | --- |')
 for (const row of regressions) add(`| ${row.ticker} | ${row.metric} | ${row.period} | ${fmt(row.previousValueUsd)} | ${row.currentStatus} | ${escapeTable(row.explanation)} |`)
