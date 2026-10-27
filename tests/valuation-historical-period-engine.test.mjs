@@ -167,9 +167,12 @@ for (const [label, start, end, value] of [
   ['52-week', '2023-12-31', '2024-12-28', 364],
   ['53-week', '2023-12-31', '2025-01-04', 371],
 ]) {
-  test(`${label} calendar issuer retains its reported annual observation`, () => {
+  test(`${label} fiscal annual stays separate from exact January-December actual`, () => {
     const annual = observation({ ticker: label, type: PERIOD_TYPE.FISCAL_YEAR, start, end, value })
-    assert.equal(buildCalendarYear([annual], 2024).classification, CY_CLASSIFICATION.REPORTED_CALENDAR_YEAR)
+    const calendar = buildCalendarYear([annual], 2024)
+    assert.notEqual(calendar.classification, CY_CLASSIFICATION.REPORTED_CALENDAR_YEAR)
+    assert.notEqual(calendar.classification, CY_CLASSIFICATION.EXACT_DERIVED_CALENDAR_YEAR)
+    assert.equal(annual.normalizedValue, value)
   })
 }
 

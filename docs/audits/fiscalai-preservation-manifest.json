@@ -1,0 +1,5038 @@
+{
+  "schemaVersion": 1,
+  "generatedAtUtc": "2026-10-26T04:47:48.766Z",
+  "repository": "VariantEdge/Market-Map",
+  "branch": "review/fiscalai-migration",
+  "scope": {
+    "tickers": [
+      "AMZN",
+      "BE",
+      "CRWV",
+      "FCEL",
+      "GEV",
+      "GOOGL",
+      "INTC",
+      "IREN",
+      "META",
+      "MU",
+      "MSFT",
+      "NBIS"
+    ],
+    "auditPeriods": [
+      "2023A",
+      "2024A",
+      "2025A",
+      "LTM"
+    ],
+    "periodTypesInspected": [
+      "Annual",
+      "Quarterly",
+      "Semi-Annual",
+      "YTD",
+      "LTM"
+    ]
+  },
+  "archivePathHint": "%LOCALAPPDATA%/MarketMap/FiscalAiPreservation/2026-10-25",
+  "distribution": "Internal licensed-use archive only. Raw provider files and audit fixtures must not be committed to public GitHub.",
+  "retentionCaveat": "Fiscal.ai order-form retention rights were not available to inspect. Use only while authorized and delete if the applicable agreement requires it.",
+  "files": [
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "AMZN",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/AMZN.json",
+      "archiveRelativePath": "provider/AMZN.json",
+      "bytes": 238620,
+      "sha256": "ae84e0a789cfb7ccdd07831ea27bd83542286d3754891e5fe58e8cbc1fee066d",
+      "sourceRetrievalDateUtc": "2026-10-25T07:38:29.634Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:38:29.635Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "BE",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/BE.json",
+      "archiveRelativePath": "provider/BE.json",
+      "bytes": 238648,
+      "sha256": "093f8e9b2ac53c59ea8cd58310a8a89bf38bb1e6c2feb3cc22fc427fa70a323c",
+      "sourceRetrievalDateUtc": "2026-10-25T07:38:35.779Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:38:35.794Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "CRWV",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/CRWV.json",
+      "archiveRelativePath": "provider/CRWV.json",
+      "bytes": 162230,
+      "sha256": "9e2ac1e2aed175693dc28b27e45b4129bfda4be74fb911bd43b2cf4b2f2f84c7",
+      "sourceRetrievalDateUtc": "2026-10-25T07:38:22.477Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:38:22.478Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "FCEL",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/FCEL.json",
+      "archiveRelativePath": "provider/FCEL.json",
+      "bytes": 268025,
+      "sha256": "125775153a1400fc64f944a4b459f1163b390e7d32105e83348466fbcc7b40bb",
+      "sourceRetrievalDateUtc": "2026-10-25T07:38:38.534Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:38:38.535Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "GEV",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/GEV.json",
+      "archiveRelativePath": "provider/GEV.json",
+      "bytes": 179427,
+      "sha256": "399dd9ff2f420cd257f0696bb8b3a305d696271bb7e0e0f2b571b050d1d38b3c",
+      "sourceRetrievalDateUtc": "2026-10-25T07:38:41.446Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:38:41.446Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "GOOGL",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/GOOGL.json",
+      "archiveRelativePath": "provider/GOOGL.json",
+      "bytes": 244179,
+      "sha256": "a3561e9d07dee0e5078d2addcbd5c60d8580c3d7bafd212a81e1114bac474af5",
+      "sourceRetrievalDateUtc": "2026-10-25T07:38:46.715Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:38:46.717Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "INTC",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/INTC.json",
+      "archiveRelativePath": "provider/INTC.json",
+      "bytes": 221325,
+      "sha256": "ed1bc1dc7ee0aad7b13d11912538c63ad3b50e09d676b4a9b1d949da8b918261",
+      "sourceRetrievalDateUtc": "2026-10-25T07:38:49.267Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:38:49.268Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "IREN",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/IREN.json",
+      "archiveRelativePath": "provider/IREN.json",
+      "bytes": 349966,
+      "sha256": "385d7a4187c8f6dddeef5732a955fe8ec86edbbac2dd70075f66229d14b1a872",
+      "sourceRetrievalDateUtc": "2026-10-25T07:38:55.645Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:38:55.645Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "META",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/META.json",
+      "archiveRelativePath": "provider/META.json",
+      "bytes": 253131,
+      "sha256": "565d6942cab17223cee57788bfa00ae49ff7745e7059fb810134cc29f092033a",
+      "sourceRetrievalDateUtc": "2026-10-25T07:38:57.974Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:38:57.975Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "MU",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/MU.json",
+      "archiveRelativePath": "provider/MU.json",
+      "bytes": 234227,
+      "sha256": "c92c510a13710109119495a7c034c0b84842f3f833024e8140d7107db4d8e972",
+      "sourceRetrievalDateUtc": "2026-10-25T07:39:02.785Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:39:02.785Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "MSFT",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/MSFT.json",
+      "archiveRelativePath": "provider/MSFT.json",
+      "bytes": 221282,
+      "sha256": "8c65621491bcb536925e21fdba6dd0dd9e898a56c4bc0a0098a2021cf5e26378",
+      "sourceRetrievalDateUtc": "2026-10-25T07:39:05.079Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:39:05.079Z"
+    },
+    {
+      "kind": "fiscal_mcp_capture",
+      "ticker": "NBIS",
+      "sourceRelativePath": ".cache/fiscal-ai-mcp-2026-10-25/NBIS.json",
+      "archiveRelativePath": "provider/NBIS.json",
+      "bytes": 273126,
+      "sha256": "4e741bfdf948c557f32ee21ba21e9d32d680b047ad87736d72b27fb891e61c18",
+      "sourceRetrievalDateUtc": "2026-10-25T07:39:10.882Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T07:39:10.882Z"
+    },
+    {
+      "kind": "targeted_as_reported_capture",
+      "ticker": "AMZN",
+      "sourceRelativePath": ".cache/fiscal-ai-as-reported-2026-10-25/AMZN-income-core.json",
+      "archiveRelativePath": "as-reported/AMZN-income-core.json",
+      "bytes": 193904,
+      "sha256": "f750557d04e435ba74a2fab867bc4b15f3fd72c26f3b4bad29ad9a38f6491e38",
+      "sourceRetrievalDateUtc": "2026-10-26T04:32:14.797Z",
+      "retrievalDateBasis": "MCP capture timestamp",
+      "sourceModifiedAtUtc": "2026-10-26T04:32:18.150Z"
+    },
+    {
+      "kind": "local_audit_fixture",
+      "ticker": null,
+      "sourceRelativePath": ".cache/financial-audits/financial-audit-2026-10-19T04-01-55Z.json",
+      "archiveRelativePath": "audit-fixtures/financial-audit-2026-10-19T04-01-55Z.json",
+      "bytes": 2272609,
+      "sha256": "c2222738e887c33cc66fe85959c2f5120ac501ffd99ac39f9ba80a250faa3991",
+      "sourceRetrievalDateUtc": "2026-10-19T04:01:55.237Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-19T04:01:55.317Z"
+    },
+    {
+      "kind": "local_audit_fixture",
+      "ticker": null,
+      "sourceRelativePath": ".cache/financial-audits/financial-audit-2026-10-25T22-18-28Z.json",
+      "archiveRelativePath": "audit-fixtures/financial-audit-2026-10-25T22-18-28Z.json",
+      "bytes": 2491746,
+      "sha256": "12d4cc35e035b1e9c7867b06764553495eda6d058ae7b01535f6f5b3e584373b",
+      "sourceRetrievalDateUtc": "2026-10-25T22:18:28.644Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T22:18:29.031Z"
+    },
+    {
+      "kind": "local_audit_fixture",
+      "ticker": null,
+      "sourceRelativePath": ".cache/financial-audits/financial-audit-2026-10-25T22-48-48Z.json",
+      "archiveRelativePath": "audit-fixtures/financial-audit-2026-10-25T22-48-48Z.json",
+      "bytes": 2443321,
+      "sha256": "f008cbaa74df7cb7891615aac5d63f5737b041fd984e0f0b08699c759a6db2e4",
+      "sourceRetrievalDateUtc": "2026-10-25T22:48:48.438Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T22:48:48.491Z"
+    },
+    {
+      "kind": "local_audit_fixture",
+      "ticker": null,
+      "sourceRelativePath": ".cache/financial-audits/financial-audit-2026-10-25T23-02-07Z.json",
+      "archiveRelativePath": "audit-fixtures/financial-audit-2026-10-25T23-02-07Z.json",
+      "bytes": 2450402,
+      "sha256": "09ed877f9c810daad020c7e8df1820a8904013d3844c0688f3af6f99b1baed27",
+      "sourceRetrievalDateUtc": "2026-10-25T23:02:07.745Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-25T23:02:07.807Z"
+    },
+    {
+      "kind": "local_audit_fixture",
+      "ticker": null,
+      "sourceRelativePath": ".cache/financial-audits/financial-audit-2026-10-26T04-36-08Z.json",
+      "archiveRelativePath": "audit-fixtures/financial-audit-2026-10-26T04-36-08Z.json",
+      "bytes": 185648,
+      "sha256": "5da05d791a1d7c2ed51d4fc16b4c1ffdbd707eb1448cc1e2b34dcce195cf2008",
+      "sourceRetrievalDateUtc": "2026-10-26T04:36:08.101Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-26T04:36:08.104Z"
+    },
+    {
+      "kind": "local_audit_fixture",
+      "ticker": null,
+      "sourceRelativePath": ".cache/financial-audits/financial-audit-2026-10-26T04-47-29Z.json",
+      "archiveRelativePath": "audit-fixtures/financial-audit-2026-10-26T04-47-29Z.json",
+      "bytes": 2450402,
+      "sha256": "64afd1587b6486a3d797ad6b00a184850ed2dfd516eb120ba92352556e5ad067",
+      "sourceRetrievalDateUtc": "2026-10-26T04:47:29.840Z",
+      "retrievalDateBasis": "local file creation timestamp; exact MCP retrieval time not recorded",
+      "sourceModifiedAtUtc": "2026-10-26T04:47:29.943Z"
+    }
+  ],
+  "tickerCoverage": [
+    {
+      "ticker": "AMZN",
+      "companyKey": "NASDAQ_AMZN",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 4,
+                "income_statement_operating_profit": 4,
+                "income_statement_total_revenues": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 9,
+                "income_statement_operating_profit": 9,
+                "income_statement_total_revenues": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "standardizedCashFlow": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 4,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 9,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "adjustedMetrics": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        }
+      },
+      "targetedAsReportedIncome": {
+        "rows": 67,
+        "periodTypes": {
+          "Annual": {
+            "rows": 4,
+            "periodEnds": [
+              "2022-12-31",
+              "2023-12-31",
+              "2024-12-31",
+              "2025-12-31"
+            ],
+            "nonNullByMetric": {
+              "4_IS_33048": 4,
+              "4_IS_33834": 4,
+              "4_IS_42249": 4,
+              "4_IS_59413": 4
+            }
+          },
+          "Quarterly": {
+            "rows": 18,
+            "periodEnds": [
+              "2022-03-31",
+              "2022-06-30",
+              "2022-09-30",
+              "2022-12-31",
+              "2023-03-31",
+              "2023-06-30",
+              "2023-09-30",
+              "2023-12-31",
+              "2024-03-31",
+              "2024-06-30",
+              "2024-09-30",
+              "2024-12-31",
+              "2025-03-31",
+              "2025-06-30",
+              "2025-09-30",
+              "2025-12-31",
+              "2026-03-31",
+              "2026-06-30"
+            ],
+            "nonNullByMetric": {
+              "4_IS_33048": 18,
+              "4_IS_33834": 18,
+              "4_IS_42249": 18,
+              "4_IS_59413": 18
+            }
+          },
+          "Semi-Annual": {
+            "rows": 9,
+            "periodEnds": [
+              "2022-06-30",
+              "2022-12-31",
+              "2023-06-30",
+              "2023-12-31",
+              "2024-06-30",
+              "2024-12-31",
+              "2025-06-30",
+              "2025-12-31",
+              "2026-06-30"
+            ],
+            "nonNullByMetric": {
+              "4_IS_33048": 9,
+              "4_IS_33834": 9,
+              "4_IS_42249": 9,
+              "4_IS_59413": 9
+            }
+          },
+          "YTD": {
+            "rows": 18,
+            "periodEnds": [
+              "2022-03-31",
+              "2022-06-30",
+              "2022-09-30",
+              "2022-12-31",
+              "2023-03-31",
+              "2023-06-30",
+              "2023-09-30",
+              "2023-12-31",
+              "2024-03-31",
+              "2024-06-30",
+              "2024-09-30",
+              "2024-12-31",
+              "2025-03-31",
+              "2025-06-30",
+              "2025-09-30",
+              "2025-12-31",
+              "2026-03-31",
+              "2026-06-30"
+            ],
+            "nonNullByMetric": {
+              "4_IS_33048": 18,
+              "4_IS_33834": 18,
+              "4_IS_42249": 18,
+              "4_IS_59413": 18
+            }
+          },
+          "LTM": {
+            "rows": 18,
+            "periodEnds": [
+              "2022-03-31",
+              "2022-06-30",
+              "2022-09-30",
+              "2022-12-31",
+              "2023-03-31",
+              "2023-06-30",
+              "2023-09-30",
+              "2023-12-31",
+              "2024-03-31",
+              "2024-06-30",
+              "2024-09-30",
+              "2024-12-31",
+              "2025-03-31",
+              "2025-06-30",
+              "2025-09-30",
+              "2025-12-31",
+              "2026-03-31",
+              "2026-06-30"
+            ],
+            "nonNullByMetric": {
+              "4_IS_33048": 18,
+              "4_IS_33834": 18,
+              "4_IS_42249": 18,
+              "4_IS_59413": 18
+            }
+          }
+        },
+        "missingPeriodTypes": [],
+        "missingCalendarYearAnnualRows": []
+      },
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "BE",
+      "companyKey": "NYSE_BE",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 70,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 4,
+                "income_statement_operating_profit": 4,
+                "income_statement_total_revenues": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 9,
+                "income_statement_operating_profit": 9,
+                "income_statement_total_revenues": 9
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "standardizedCashFlow": {
+          "rows": 70,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 4,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 9,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 9
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "adjustedMetrics": {
+          "rows": 70,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 9
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "CRWV",
+      "companyKey": "NASDAQ_CRWV",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 43,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 4,
+                "income_statement_operating_profit": 4,
+                "income_statement_total_revenues": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 11,
+              "periodEnds": [
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 11,
+                "income_statement_operating_profit": 11,
+                "income_statement_total_revenues": 11
+              }
+            },
+            "Semi-Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 5,
+                "income_statement_operating_profit": 5,
+                "income_statement_total_revenues": 5
+              }
+            },
+            "YTD": {
+              "rows": 13,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 13,
+                "income_statement_operating_profit": 13,
+                "income_statement_total_revenues": 13
+              }
+            },
+            "LTM": {
+              "rows": 10,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 10,
+                "income_statement_operating_profit": 10,
+                "income_statement_total_revenues": 10
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "standardizedCashFlow": {
+          "rows": 43,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 4,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 11,
+              "periodEnds": [
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 11,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 11
+              }
+            },
+            "Semi-Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 5,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 5
+              }
+            },
+            "YTD": {
+              "rows": 13,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 13,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 13
+              }
+            },
+            "LTM": {
+              "rows": 10,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 10,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 10
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "adjustedMetrics": {
+          "rows": 53,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 14,
+              "periodEnds": [
+                "2022-09-30",
+                "2022-12-31",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 14
+              }
+            },
+            "Semi-Annual": {
+              "rows": 7,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 7
+              }
+            },
+            "YTD": {
+              "rows": 14,
+              "periodEnds": [
+                "2022-09-30",
+                "2022-12-31",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 14
+              }
+            },
+            "LTM": {
+              "rows": 14,
+              "periodEnds": [
+                "2022-09-30",
+                "2022-12-31",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 14
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "FCEL",
+      "companyKey": "NASDAQ_FCEL",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 70,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-10-31",
+                "2023-10-31",
+                "2024-10-31",
+                "2025-10-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 4,
+                "income_statement_operating_profit": 4,
+                "income_statement_total_revenues": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-01-31",
+                "2022-04-30",
+                "2022-07-31",
+                "2022-10-31",
+                "2023-01-31",
+                "2023-04-30",
+                "2023-07-31",
+                "2023-10-31",
+                "2024-01-31",
+                "2024-04-30",
+                "2024-07-31",
+                "2024-10-31",
+                "2025-01-31",
+                "2025-04-30",
+                "2025-07-31",
+                "2025-10-31",
+                "2026-01-31",
+                "2026-04-30",
+                "2026-07-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-04-30",
+                "2022-10-31",
+                "2023-04-30",
+                "2023-10-31",
+                "2024-04-30",
+                "2024-10-31",
+                "2025-04-30",
+                "2025-10-31",
+                "2026-04-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 9,
+                "income_statement_operating_profit": 9,
+                "income_statement_total_revenues": 9
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-01-31",
+                "2022-04-30",
+                "2022-07-31",
+                "2022-10-31",
+                "2023-01-31",
+                "2023-04-30",
+                "2023-07-31",
+                "2023-10-31",
+                "2024-01-31",
+                "2024-04-30",
+                "2024-07-31",
+                "2024-10-31",
+                "2025-01-31",
+                "2025-04-30",
+                "2025-07-31",
+                "2025-10-31",
+                "2026-01-31",
+                "2026-04-30",
+                "2026-07-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-01-31",
+                "2022-04-30",
+                "2022-07-31",
+                "2022-10-31",
+                "2023-01-31",
+                "2023-04-30",
+                "2023-07-31",
+                "2023-10-31",
+                "2024-01-31",
+                "2024-04-30",
+                "2024-07-31",
+                "2024-10-31",
+                "2025-01-31",
+                "2025-04-30",
+                "2025-07-31",
+                "2025-10-31",
+                "2026-01-31",
+                "2026-04-30",
+                "2026-07-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        },
+        "standardizedCashFlow": {
+          "rows": 70,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-10-31",
+                "2023-10-31",
+                "2024-10-31",
+                "2025-10-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 4,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-01-31",
+                "2022-04-30",
+                "2022-07-31",
+                "2022-10-31",
+                "2023-01-31",
+                "2023-04-30",
+                "2023-07-31",
+                "2023-10-31",
+                "2024-01-31",
+                "2024-04-30",
+                "2024-07-31",
+                "2024-10-31",
+                "2025-01-31",
+                "2025-04-30",
+                "2025-07-31",
+                "2025-10-31",
+                "2026-01-31",
+                "2026-04-30",
+                "2026-07-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-04-30",
+                "2022-10-31",
+                "2023-04-30",
+                "2023-10-31",
+                "2024-04-30",
+                "2024-10-31",
+                "2025-04-30",
+                "2025-10-31",
+                "2026-04-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 9,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 9
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-01-31",
+                "2022-04-30",
+                "2022-07-31",
+                "2022-10-31",
+                "2023-01-31",
+                "2023-04-30",
+                "2023-07-31",
+                "2023-10-31",
+                "2024-01-31",
+                "2024-04-30",
+                "2024-07-31",
+                "2024-10-31",
+                "2025-01-31",
+                "2025-04-30",
+                "2025-07-31",
+                "2025-10-31",
+                "2026-01-31",
+                "2026-04-30",
+                "2026-07-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-01-31",
+                "2022-04-30",
+                "2022-07-31",
+                "2022-10-31",
+                "2023-01-31",
+                "2023-04-30",
+                "2023-07-31",
+                "2023-10-31",
+                "2024-01-31",
+                "2024-04-30",
+                "2024-07-31",
+                "2024-10-31",
+                "2025-01-31",
+                "2025-04-30",
+                "2025-07-31",
+                "2025-10-31",
+                "2026-01-31",
+                "2026-04-30",
+                "2026-07-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        },
+        "adjustedMetrics": {
+          "rows": 70,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-10-31",
+                "2023-10-31",
+                "2024-10-31",
+                "2025-10-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-01-31",
+                "2022-04-30",
+                "2022-07-31",
+                "2022-10-31",
+                "2023-01-31",
+                "2023-04-30",
+                "2023-07-31",
+                "2023-10-31",
+                "2024-01-31",
+                "2024-04-30",
+                "2024-07-31",
+                "2024-10-31",
+                "2025-01-31",
+                "2025-04-30",
+                "2025-07-31",
+                "2025-10-31",
+                "2026-01-31",
+                "2026-04-30",
+                "2026-07-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-04-30",
+                "2022-10-31",
+                "2023-04-30",
+                "2023-10-31",
+                "2024-04-30",
+                "2024-10-31",
+                "2025-04-30",
+                "2025-10-31",
+                "2026-04-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 9
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-01-31",
+                "2022-04-30",
+                "2022-07-31",
+                "2022-10-31",
+                "2023-01-31",
+                "2023-04-30",
+                "2023-07-31",
+                "2023-10-31",
+                "2024-01-31",
+                "2024-04-30",
+                "2024-07-31",
+                "2024-10-31",
+                "2025-01-31",
+                "2025-04-30",
+                "2025-07-31",
+                "2025-10-31",
+                "2026-01-31",
+                "2026-04-30",
+                "2026-07-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-01-31",
+                "2022-04-30",
+                "2022-07-31",
+                "2022-10-31",
+                "2023-01-31",
+                "2023-04-30",
+                "2023-07-31",
+                "2023-10-31",
+                "2024-01-31",
+                "2024-04-30",
+                "2024-07-31",
+                "2024-10-31",
+                "2025-01-31",
+                "2025-04-30",
+                "2025-07-31",
+                "2025-10-31",
+                "2026-01-31",
+                "2026-04-30",
+                "2026-07-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "GEV",
+      "companyKey": "NYSE_GEV",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 52,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 4,
+                "income_statement_operating_profit": 4,
+                "income_statement_total_revenues": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 14,
+              "periodEnds": [
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 14,
+                "income_statement_operating_profit": 14,
+                "income_statement_total_revenues": 14
+              }
+            },
+            "Semi-Annual": {
+              "rows": 7,
+              "periodEnds": [
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 7,
+                "income_statement_operating_profit": 7,
+                "income_statement_total_revenues": 7
+              }
+            },
+            "YTD": {
+              "rows": 15,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 15,
+                "income_statement_operating_profit": 15,
+                "income_statement_total_revenues": 15
+              }
+            },
+            "LTM": {
+              "rows": 12,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 12,
+                "income_statement_operating_profit": 12,
+                "income_statement_total_revenues": 12
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "standardizedCashFlow": {
+          "rows": 53,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 4,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 14,
+              "periodEnds": [
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 14,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 14
+              }
+            },
+            "Semi-Annual": {
+              "rows": 7,
+              "periodEnds": [
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 7,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 7
+              }
+            },
+            "YTD": {
+              "rows": 15,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 15,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 15
+              }
+            },
+            "LTM": {
+              "rows": 13,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 12,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 12
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "adjustedMetrics": {
+          "rows": 60,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 16,
+              "periodEnds": [
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 16
+              }
+            },
+            "Semi-Annual": {
+              "rows": 8,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 8
+              }
+            },
+            "YTD": {
+              "rows": 16,
+              "periodEnds": [
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 16
+              }
+            },
+            "LTM": {
+              "rows": 16,
+              "periodEnds": [
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 16
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "GOOGL",
+      "companyKey": "NASDAQ_GOOG",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 4,
+                "income_statement_operating_profit": 4,
+                "income_statement_total_revenues": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 9,
+                "income_statement_operating_profit": 9,
+                "income_statement_total_revenues": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "standardizedCashFlow": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 4,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 9,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "adjustedMetrics": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "INTC",
+      "companyKey": "NASDAQ_INTC",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-30",
+                "2024-12-28",
+                "2025-12-27"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 4,
+                "income_statement_operating_profit": 4,
+                "income_statement_total_revenues": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-04-02",
+                "2022-07-02",
+                "2022-10-01",
+                "2022-12-31",
+                "2023-04-01",
+                "2023-07-01",
+                "2023-09-30",
+                "2023-12-30",
+                "2024-03-30",
+                "2024-06-29",
+                "2024-09-28",
+                "2024-12-28",
+                "2025-03-29",
+                "2025-06-28",
+                "2025-09-27",
+                "2025-12-27",
+                "2026-03-28",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-07-02",
+                "2022-12-31",
+                "2023-07-01",
+                "2023-12-30",
+                "2024-06-29",
+                "2024-12-28",
+                "2025-06-28",
+                "2025-12-27",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 9,
+                "income_statement_operating_profit": 9,
+                "income_statement_total_revenues": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-04-02",
+                "2022-07-02",
+                "2022-10-01",
+                "2022-12-31",
+                "2023-04-01",
+                "2023-07-01",
+                "2023-09-30",
+                "2023-12-30",
+                "2024-03-30",
+                "2024-06-29",
+                "2024-09-28",
+                "2024-12-28",
+                "2025-03-29",
+                "2025-06-28",
+                "2025-09-27",
+                "2025-12-27",
+                "2026-03-28",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-04-02",
+                "2022-07-02",
+                "2022-10-01",
+                "2022-12-31",
+                "2023-04-01",
+                "2023-07-01",
+                "2023-09-30",
+                "2023-12-30",
+                "2024-03-30",
+                "2024-06-29",
+                "2024-09-28",
+                "2024-12-28",
+                "2025-03-29",
+                "2025-06-28",
+                "2025-09-27",
+                "2025-12-27",
+                "2026-03-28",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        },
+        "standardizedCashFlow": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-30",
+                "2024-12-28",
+                "2025-12-27"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 4,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-04-02",
+                "2022-07-02",
+                "2022-10-01",
+                "2022-12-31",
+                "2023-04-01",
+                "2023-07-01",
+                "2023-09-30",
+                "2023-12-30",
+                "2024-03-30",
+                "2024-06-29",
+                "2024-09-28",
+                "2024-12-28",
+                "2025-03-29",
+                "2025-06-28",
+                "2025-09-27",
+                "2025-12-27",
+                "2026-03-28",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-07-02",
+                "2022-12-31",
+                "2023-07-01",
+                "2023-12-30",
+                "2024-06-29",
+                "2024-12-28",
+                "2025-06-28",
+                "2025-12-27",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 9,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-04-02",
+                "2022-07-02",
+                "2022-10-01",
+                "2022-12-31",
+                "2023-04-01",
+                "2023-07-01",
+                "2023-09-30",
+                "2023-12-30",
+                "2024-03-30",
+                "2024-06-29",
+                "2024-09-28",
+                "2024-12-28",
+                "2025-03-29",
+                "2025-06-28",
+                "2025-09-27",
+                "2025-12-27",
+                "2026-03-28",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-04-02",
+                "2022-07-02",
+                "2022-10-01",
+                "2022-12-31",
+                "2023-04-01",
+                "2023-07-01",
+                "2023-09-30",
+                "2023-12-30",
+                "2024-03-30",
+                "2024-06-29",
+                "2024-09-28",
+                "2024-12-28",
+                "2025-03-29",
+                "2025-06-28",
+                "2025-09-27",
+                "2025-12-27",
+                "2026-03-28",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        },
+        "adjustedMetrics": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-30",
+                "2024-12-28",
+                "2025-12-27"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-04-02",
+                "2022-07-02",
+                "2022-10-01",
+                "2022-12-31",
+                "2023-04-01",
+                "2023-07-01",
+                "2023-09-30",
+                "2023-12-30",
+                "2024-03-30",
+                "2024-06-29",
+                "2024-09-28",
+                "2024-12-28",
+                "2025-03-29",
+                "2025-06-28",
+                "2025-09-27",
+                "2025-12-27",
+                "2026-03-28",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-07-02",
+                "2022-12-31",
+                "2023-07-01",
+                "2023-12-30",
+                "2024-06-29",
+                "2024-12-28",
+                "2025-06-28",
+                "2025-12-27",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-04-02",
+                "2022-07-02",
+                "2022-10-01",
+                "2022-12-31",
+                "2023-04-01",
+                "2023-07-01",
+                "2023-09-30",
+                "2023-12-30",
+                "2024-03-30",
+                "2024-06-29",
+                "2024-09-28",
+                "2024-12-28",
+                "2025-03-29",
+                "2025-06-28",
+                "2025-09-27",
+                "2025-12-27",
+                "2026-03-28",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-04-02",
+                "2022-07-02",
+                "2022-10-01",
+                "2022-12-31",
+                "2023-04-01",
+                "2023-07-01",
+                "2023-09-30",
+                "2023-12-30",
+                "2024-03-30",
+                "2024-06-29",
+                "2024-09-28",
+                "2024-12-28",
+                "2025-03-29",
+                "2025-06-28",
+                "2025-09-27",
+                "2025-12-27",
+                "2026-03-28",
+                "2026-06-27"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "IREN",
+      "companyKey": "NASDAQ_IREN",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 68,
+          "periodTypes": {
+            "Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2022-06-30",
+                "2023-06-30",
+                "2024-06-30",
+                "2025-06-30",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 5,
+                "income_statement_operating_profit": 5,
+                "income_statement_total_revenues": 5
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 9,
+                "income_statement_operating_profit": 9,
+                "income_statement_total_revenues": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        },
+        "standardizedCashFlow": {
+          "rows": 61,
+          "periodTypes": {
+            "Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2022-06-30",
+                "2023-06-30",
+                "2024-06-30",
+                "2025-06-30",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 5,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 5
+              }
+            },
+            "Quarterly": {
+              "rows": 16,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 16,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 16
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 9,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 9
+              }
+            },
+            "YTD": {
+              "rows": 17,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 17,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 17
+              }
+            },
+            "LTM": {
+              "rows": 14,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 14,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 14
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        },
+        "adjustedMetrics": {
+          "rows": 68,
+          "periodTypes": {
+            "Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2022-06-30",
+                "2023-06-30",
+                "2024-06-30",
+                "2025-06-30",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 5
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [
+            "2022-09-30",
+            "2022-12-31"
+          ],
+          "Semi-Annual": [],
+          "YTD": [
+            "2022-09-30"
+          ],
+          "LTM": [
+            "2022-09-30",
+            "2022-12-31",
+            "2023-03-31",
+            "2023-09-30"
+          ]
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "META",
+      "companyKey": "NASDAQ_META",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 70,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 4,
+                "income_statement_operating_profit": 4,
+                "income_statement_total_revenues": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 9,
+                "income_statement_operating_profit": 9,
+                "income_statement_total_revenues": 9
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "standardizedCashFlow": {
+          "rows": 70,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 4,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 9,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 9
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "adjustedMetrics": {
+          "rows": 70,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 9
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30",
+                "2026-09-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "MU",
+      "companyKey": "NASDAQ_MU",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 72,
+          "periodTypes": {
+            "Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2022-09-01",
+                "2023-08-31",
+                "2024-08-29",
+                "2025-08-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 5,
+                "income_statement_operating_profit": 5,
+                "income_statement_total_revenues": 5
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-06-02",
+                "2022-09-01",
+                "2022-12-01",
+                "2023-03-02",
+                "2023-06-01",
+                "2023-08-31",
+                "2023-11-30",
+                "2024-02-29",
+                "2024-05-30",
+                "2024-08-29",
+                "2024-11-28",
+                "2025-02-27",
+                "2025-05-29",
+                "2025-08-28",
+                "2025-11-27",
+                "2026-02-26",
+                "2026-05-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 10,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-09-01",
+                "2023-03-02",
+                "2023-08-31",
+                "2024-02-29",
+                "2024-08-29",
+                "2025-02-27",
+                "2025-08-28",
+                "2026-02-26",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 10,
+                "income_statement_operating_profit": 10,
+                "income_statement_total_revenues": 10
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-06-02",
+                "2022-09-01",
+                "2022-12-01",
+                "2023-03-02",
+                "2023-06-01",
+                "2023-08-31",
+                "2023-11-30",
+                "2024-02-29",
+                "2024-05-30",
+                "2024-08-29",
+                "2024-11-28",
+                "2025-02-27",
+                "2025-05-29",
+                "2025-08-28",
+                "2025-11-27",
+                "2026-02-26",
+                "2026-05-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-06-02",
+                "2022-09-01",
+                "2022-12-01",
+                "2023-03-02",
+                "2023-06-01",
+                "2023-08-31",
+                "2023-11-30",
+                "2024-02-29",
+                "2024-05-30",
+                "2024-08-29",
+                "2024-11-28",
+                "2025-02-27",
+                "2025-05-29",
+                "2025-08-28",
+                "2025-11-27",
+                "2026-02-26",
+                "2026-05-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 19,
+                "income_statement_operating_profit": 19,
+                "income_statement_total_revenues": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        },
+        "standardizedCashFlow": {
+          "rows": 72,
+          "periodTypes": {
+            "Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2022-09-01",
+                "2023-08-31",
+                "2024-08-29",
+                "2025-08-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 5,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 5
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-06-02",
+                "2022-09-01",
+                "2022-12-01",
+                "2023-03-02",
+                "2023-06-01",
+                "2023-08-31",
+                "2023-11-30",
+                "2024-02-29",
+                "2024-05-30",
+                "2024-08-29",
+                "2024-11-28",
+                "2025-02-27",
+                "2025-05-29",
+                "2025-08-28",
+                "2025-11-27",
+                "2026-02-26",
+                "2026-05-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 10,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-09-01",
+                "2023-03-02",
+                "2023-08-31",
+                "2024-02-29",
+                "2024-08-29",
+                "2025-02-27",
+                "2025-08-28",
+                "2026-02-26",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 10,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 10
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-06-02",
+                "2022-09-01",
+                "2022-12-01",
+                "2023-03-02",
+                "2023-06-01",
+                "2023-08-31",
+                "2023-11-30",
+                "2024-02-29",
+                "2024-05-30",
+                "2024-08-29",
+                "2024-11-28",
+                "2025-02-27",
+                "2025-05-29",
+                "2025-08-28",
+                "2025-11-27",
+                "2026-02-26",
+                "2026-05-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-06-02",
+                "2022-09-01",
+                "2022-12-01",
+                "2023-03-02",
+                "2023-06-01",
+                "2023-08-31",
+                "2023-11-30",
+                "2024-02-29",
+                "2024-05-30",
+                "2024-08-29",
+                "2024-11-28",
+                "2025-02-27",
+                "2025-05-29",
+                "2025-08-28",
+                "2025-11-27",
+                "2026-02-26",
+                "2026-05-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 19,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        },
+        "adjustedMetrics": {
+          "rows": 72,
+          "periodTypes": {
+            "Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2022-09-01",
+                "2023-08-31",
+                "2024-08-29",
+                "2025-08-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 5
+              }
+            },
+            "Quarterly": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-06-02",
+                "2022-09-01",
+                "2022-12-01",
+                "2023-03-02",
+                "2023-06-01",
+                "2023-08-31",
+                "2023-11-30",
+                "2024-02-29",
+                "2024-05-30",
+                "2024-08-29",
+                "2024-11-28",
+                "2025-02-27",
+                "2025-05-29",
+                "2025-08-28",
+                "2025-11-27",
+                "2026-02-26",
+                "2026-05-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            },
+            "Semi-Annual": {
+              "rows": 10,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-09-01",
+                "2023-03-02",
+                "2023-08-31",
+                "2024-02-29",
+                "2024-08-29",
+                "2025-02-27",
+                "2025-08-28",
+                "2026-02-26",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 10
+              }
+            },
+            "YTD": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-06-02",
+                "2022-09-01",
+                "2022-12-01",
+                "2023-03-02",
+                "2023-06-01",
+                "2023-08-31",
+                "2023-11-30",
+                "2024-02-29",
+                "2024-05-30",
+                "2024-08-29",
+                "2024-11-28",
+                "2025-02-27",
+                "2025-05-29",
+                "2025-08-28",
+                "2025-11-27",
+                "2026-02-26",
+                "2026-05-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            },
+            "LTM": {
+              "rows": 19,
+              "periodEnds": [
+                "2022-03-03",
+                "2022-06-02",
+                "2022-09-01",
+                "2022-12-01",
+                "2023-03-02",
+                "2023-06-01",
+                "2023-08-31",
+                "2023-11-30",
+                "2024-02-29",
+                "2024-05-30",
+                "2024-08-29",
+                "2024-11-28",
+                "2025-02-27",
+                "2025-05-29",
+                "2025-08-28",
+                "2025-11-27",
+                "2026-02-26",
+                "2026-05-28",
+                "2026-09-03"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 19
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "MSFT",
+      "companyKey": "NASDAQ_MSFT",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 68,
+          "periodTypes": {
+            "Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2022-06-30",
+                "2023-06-30",
+                "2024-06-30",
+                "2025-06-30",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 5,
+                "income_statement_operating_profit": 5,
+                "income_statement_total_revenues": 5
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 9,
+                "income_statement_operating_profit": 9,
+                "income_statement_total_revenues": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        },
+        "standardizedCashFlow": {
+          "rows": 68,
+          "periodTypes": {
+            "Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2022-06-30",
+                "2023-06-30",
+                "2024-06-30",
+                "2025-06-30",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 5,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 5
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 9,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 18,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        },
+        "adjustedMetrics": {
+          "rows": 68,
+          "periodTypes": {
+            "Annual": {
+              "rows": 5,
+              "periodEnds": [
+                "2022-06-30",
+                "2023-06-30",
+                "2024-06-30",
+                "2025-06-30",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 5
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": [
+            2023,
+            2024,
+            2025
+          ]
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    },
+    {
+      "ticker": "NBIS",
+      "companyKey": "NASDAQ_NBIS",
+      "endpoints": {
+        "standardizedIncome": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 4,
+                "income_statement_operating_profit": 4,
+                "income_statement_total_revenues": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 9,
+                "income_statement_operating_profit": 9,
+                "income_statement_total_revenues": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "income_statement_gross_profit": 18,
+                "income_statement_operating_profit": 18,
+                "income_statement_total_revenues": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "standardizedCashFlow": {
+          "rows": 60,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 4,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 16,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 16,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 16
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 9,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 9
+              }
+            },
+            "YTD": {
+              "rows": 17,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 17,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 17
+              }
+            },
+            "LTM": {
+              "rows": 14,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "cash_flow_statement_cash_from_operating_activities": 14,
+                "cash_flow_statement_purchases_of_property_plant_and_equipment": 14
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        },
+        "adjustedMetrics": {
+          "rows": 67,
+          "periodTypes": {
+            "Annual": {
+              "rows": 4,
+              "periodEnds": [
+                "2022-12-31",
+                "2023-12-31",
+                "2024-12-31",
+                "2025-12-31"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 4
+              }
+            },
+            "Quarterly": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "Semi-Annual": {
+              "rows": 9,
+              "periodEnds": [
+                "2022-06-30",
+                "2022-12-31",
+                "2023-06-30",
+                "2023-12-31",
+                "2024-06-30",
+                "2024-12-31",
+                "2025-06-30",
+                "2025-12-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 9
+              }
+            },
+            "YTD": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            },
+            "LTM": {
+              "rows": 18,
+              "periodEnds": [
+                "2022-03-31",
+                "2022-06-30",
+                "2022-09-30",
+                "2022-12-31",
+                "2023-03-31",
+                "2023-06-30",
+                "2023-09-30",
+                "2023-12-31",
+                "2024-03-31",
+                "2024-06-30",
+                "2024-09-30",
+                "2024-12-31",
+                "2025-03-31",
+                "2025-06-30",
+                "2025-09-30",
+                "2025-12-31",
+                "2026-03-31",
+                "2026-06-30"
+              ],
+              "nonNullByMetric": {
+                "adjusted_ebitda": 18
+              }
+            }
+          },
+          "missingPeriodTypes": [],
+          "missingCalendarYearAnnualRows": []
+        }
+      },
+      "targetedAsReportedIncome": null,
+      "missingPeriodEndsRelativeToIncome": {
+        "standardizedCashFlow": {
+          "Annual": [],
+          "Quarterly": [
+            "2024-03-31",
+            "2024-06-30"
+          ],
+          "Semi-Annual": [],
+          "YTD": [
+            "2024-03-31"
+          ],
+          "LTM": [
+            "2024-03-31",
+            "2024-06-30",
+            "2024-09-30",
+            "2025-03-31"
+          ]
+        },
+        "adjustedMetrics": {
+          "Annual": [],
+          "Quarterly": [],
+          "Semi-Annual": [],
+          "YTD": [],
+          "LTM": []
+        }
+      },
+      "missingEndpointCaptures": [
+        "asReportedIncome",
+        "asReportedCashFlow"
+      ],
+      "captureIsCompleteAsReportedExport": false,
+      "companyDefinedAdjustedEbitdaReconciliationCaptured": false,
+      "note": "MCP capture includes selected standardized financial metrics and Adjusted EBITDA; it is not a complete company statement export."
+    }
+  ]
+}

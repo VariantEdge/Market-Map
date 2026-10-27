@@ -35,6 +35,7 @@ const files = [
   ['server/valuation/filingIndex.js', 'js'],
   ['server/valuation/financialLedger.js', 'js'],
   ['server/valuation/financialSnapshot.js', 'js'],
+  ['server/valuation/fiscalAiFinancials.js', 'js'],
   ['server/valuation/historicalPeriodEngine.js', 'js'],
   ['server/valuation/interactiveCache.js', 'js'],
   ['server/valuation/issuerClassification.js', 'js'],

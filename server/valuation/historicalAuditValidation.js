@@ -154,6 +154,9 @@ export function validateHistoricalAuditRecords(records = [], { tickers = [], met
     if (!Number.isFinite(Number(record.displayedValue))) {
       issues.push({ ticker, metric, period, reason: 'NON_NUMERIC_VALUE' })
     }
+    if (record.calendarYear !== 'LTM' && record.exactness === 'CALENDARIZED_ESTIMATE') {
+      issues.push({ ticker, metric, period, reason: 'NON_EXACT_CALENDAR_VALUE' })
+    }
     if (!VERIFIED_STATUSES.has(record.validationStatus)) {
       issues.push({ ticker, metric, period, reason: 'VALUE_NOT_VERIFIED', status: record.validationStatus })
     }

@@ -4,7 +4,7 @@ import { buildFilingIndex } from '../server/valuation/filingIndex.js'
 
 const company = { ticker: 'INVENTORY', cik: '0000000001', name: 'Inventory Test Co' }
 
-test('SEC filing inventory is complete only when accession, form, and report-date arrays align', async () => {
+test('SEC filing inventory requires aligned arrays and period dates on periodic reports', async () => {
   const complete = await buildFilingIndex(company, { submissions: {
     filings: { recent: {
       form: ['10-K'], accessionNumber: ['0000000001-25-000001'],
@@ -20,4 +20,13 @@ test('SEC filing inventory is complete only when accession, form, and report-dat
     }, files: [] },
   } })
   assert.equal(missingDates.inventoryEvidence.complete, false)
+
+  const unrelatedFormWithoutPeriod = await buildFilingIndex(company, { submissions: {
+    filings: { recent: {
+      form: ['10-K', '4'], accessionNumber: ['0000000001-25-000001', '0000000001-25-000002'],
+      reportDate: ['2024-12-31', ''], filingDate: ['2025-02-01', '2025-02-02'],
+      primaryDocument: ['annual.htm', 'ownership.htm'],
+    }, files: [] },
+  } })
+  assert.equal(unrelatedFormWithoutPeriod.inventoryEvidence.complete, true)
 })

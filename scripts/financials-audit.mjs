@@ -10,7 +10,11 @@ import { MARKET_MAPS } from '../src/data.js'
 import { assertCanonicalAdjustedEbitdaEntry, ADJUSTED_EBITDA_PERIOD } from '../server/valuation/adjustedEbitdaEngine.js'
 import { buildCanonicalHistoricalFinancials } from '../server/valuation/secCanonicalFinancials.js'
 import { fetchWiseSheetsCanonicalRows } from '../server/valuation/wiseSheetsCanonicalShadow.js'
+import {
+  compareFiscalAdjustedEbitda, fetchFiscalAiHistorical, fiscalAdjustedEbitdaCandidates,
+} from '../server/valuation/fiscalAiFinancials.js'
 import { validateHistoricalAuditRecords } from '../server/valuation/historicalAuditValidation.js'
+import { buildReportedFiscalYears } from '../server/valuation/reportedFiscalYears.js'
 
 const DEFAULT_TICKERS = ['BE', 'GEV', 'FCEL', 'INTC', 'MU', 'NBIS', 'CRWV', 'IREN', 'GOOGL', 'AMZN', 'META', 'MSFT']
 const VALID_METRICS = [
@@ -85,8 +89,19 @@ const outputDirectory = path.join(process.cwd(), '.cache', 'financial-audits')
 const manifestFilename = path.join(outputDirectory, 'manifest.json')
 const previousManifest = await readJson(manifestFilename, {})
 const records = []
+const reportedFiscalYears = []
 const companyResults = []
-const wiseSheetsRows = await fetchWiseSheetsCanonicalRows(requestedTickers)
+const providerMode = option('--provider') === 'wisesheets' ? 'WISESHEETS' : 'FISCAL_AI'
+const fiscalFixtureDirectory = option('--fiscal-fixture-dir') ?? process.env.FISCAL_AI_AUDIT_FIXTURE_DIR
+const wiseSheetsRows = providerMode === 'WISESHEETS'
+  ? await fetchWiseSheetsCanonicalRows(requestedTickers) : []
+const fiscalPayloads = providerMode === 'FISCAL_AI'
+  ? fiscalFixtureDirectory
+    ? await Promise.all(requestedTickers.map(async (ticker) =>
+        JSON.parse(await readFile(path.join(fiscalFixtureDirectory, `${ticker}.json`), 'utf8'))))
+    : await fetchFiscalAiHistorical(requestedTickers, { includeAsReported: true })
+  : []
+const fiscalAiDiscrepancies = []
 
 function failClosedAdjustedEbitda(entry, requestedPeriodType) {
   if (entry?.value == null) return entry
@@ -189,6 +204,21 @@ function auditRecord({ company, ticker, cik, metric, period, entry, snapshot, cl
     quarterlyComponents: compactAuditComponents(entry?.components),
     formula: entry?.derivation ?? entry?.method ?? 'unavailable',
     derivation: entry?.derivation ?? null,
+    calculationInputs: (entry?.calculationInputs ?? []).map((input) => ({
+      metric: input.metric ?? null,
+      sourceProvider: input.sourceProvider ?? null,
+      sourceId: input.sourceId ?? null,
+      sourceUrl: input.sourceUrl ?? null,
+      accession: input.accession ?? null,
+      form: input.form ?? null,
+      concept: input.concept ?? null,
+      periodStart: input.periodIdentity?.periodStart ?? null,
+      periodEnd: input.periodIdentity?.periodEnd ?? null,
+      value: input.normalizedValue ?? null,
+      currency: input.currency ?? null,
+      scope: input.scope ?? null,
+      operationScope: input.operationScope ?? null,
+    })),
     reconciliationResults: entry?.components?.map((item) => item.formula ?? 'SEC filed component') ?? [],
     warning: [entry?.reason, ...(entry?.warnings ?? [])].filter(Boolean).join(' | '),
     failureReason: entry?.value == null ? rootCause(entry ?? {}) : null,
@@ -257,6 +287,7 @@ for (const [tickerIndex, ticker] of requestedTickers.entries()) {
     const production = await buildCanonicalHistoricalFinancials({
       ticker,
       wiseSheetsRows: wiseSheetsRows.filter((row) => String(row.ticker).toUpperCase() === ticker),
+      fiscalData: fiscalPayloads.find((item) => item.ticker === ticker) ?? null,
       company,
       facts,
       filings: filingIndex,
@@ -265,6 +296,35 @@ for (const [tickerIndex, ticker] of requestedTickers.entries()) {
       sourceSearchEvidence: supplemental.sourceSearchEvidence,
     })
     const canonical = production.canonical
+    reportedFiscalYears.push(...buildReportedFiscalYears({
+      ticker, canonical, adjustedEbitda: ledger.adjustedEbitda, years,
+    }))
+    if (providerMode === 'FISCAL_AI') {
+      for (const [metric, observations] of Object.entries(canonical.records ?? {})) {
+        for (const observation of observations ?? []) {
+          const reconciliation = observation.derivation?.reconciliation
+          if (observation.derivation?.method !== 'FISCAL_AI_VALUE_WITH_SEC_PERIOD_EVIDENCE' ||
+              reconciliation?.matches !== false) continue
+          fiscalAiDiscrepancies.push({
+            ticker, metric, periodStart: observation.periodIdentity?.periodStart,
+            periodEnd: observation.periodIdentity?.periodEnd,
+            reason: 'FISCAL_AI_SEC_VALUE_MISMATCH', fiscalValue: reconciliation.fiscalValue,
+            secValue: reconciliation.secValue, difference: reconciliation.difference,
+            fiscalSource: observation.derivation.valueSource,
+            secSource: observation.derivation.periodEvidence,
+          })
+        }
+      }
+      const candidates = fiscalAdjustedEbitdaCandidates(fiscalPayloads.find((item) => item.ticker === ticker))
+      for (const year of years) {
+        const entry = ledger.calendarActuals.ebitda?.[year]
+        const difference = compareFiscalAdjustedEbitda(entry, candidates, `${year}-12-31`, 'Annual')
+        if (difference) fiscalAiDiscrepancies.push({ ticker, period: `${year}A`, ...difference })
+      }
+      const difference = compareFiscalAdjustedEbitda(ledger.adjustedEbitda.ltm, candidates,
+        ledger.adjustedEbitda.ltm?.ltmEnd)
+      if (difference) fiscalAiDiscrepancies.push({ ticker, period: 'LTM', ...difference })
+    }
     const expectedLtmEnd = latestReportedQuarterEnd(filingIndex, ledger.rawLedger)
     const changed = previousManifest[ticker] !== ledger.snapshot.documentHash
     companyResults.push({
@@ -322,9 +382,16 @@ const auditIssues = changedOnly || statusOption ? [] : validateHistoricalAuditRe
   tickers: requestedTickers, metrics, periods: [...years.map((year) => `${year}A`), 'LTM'],
 })
 const auditIssueCells = new Set(auditIssues.map((issue) => `${issue.ticker}|${issue.metric}|${issue.period}`))
+const fiscalVerified = reportedFiscalYears.filter((cell) => cell.value != null &&
+  ['VERIFIED_REPORTED', 'VERIFIED_DERIVED'].includes(cell.status))
+const additionalUsableFiscalCells = fiscalVerified.filter((cell) =>
+  auditIssueCells.has(`${cell.ticker}|${cell.metric}|${cell.fiscalYear}A`))
 const acceptedNaCellsWithEvidence = changedOnly || statusOption ? 0 : records.filter((record) =>
   record.displayedValue == null && !auditIssueCells.has(`${record.ticker}|${record.metric}|${record.calendarYear}`)).length
-const report = { generatedAt: new Date().toISOString(), tickers: requestedTickers, years, metrics, changedOnly, companyResults, summary: { totalCompanies: companyResults.length, totalHistoricalNumbers: filteredRecords.length, ...counts, unresolvedCellCount: auditIssueCells.size, acceptedNaCellsWithEvidence, failuresByRootCause, economicSanityFlagCount: sanityFlags.length, auditIssueCount: auditIssues.length }, sanityFlags, auditIssues, records: filteredRecords }
+const report = { generatedAt: new Date().toISOString(), providerMode,
+  providerSource: providerMode === 'WISESHEETS' ? 'WISESHEETS_DATA_API' :
+    fiscalFixtureDirectory ? 'FISCAL_AI_MCP_LOCAL_CAPTURE' : 'FISCAL_AI_DATA_API',
+  tickers: requestedTickers, years, metrics, changedOnly, companyResults, fiscalAiDiscrepancies, summary: { totalCompanies: companyResults.length, totalHistoricalNumbers: filteredRecords.length, ...counts, unresolvedCellCount: auditIssueCells.size, acceptedNaCellsWithEvidence, reportedFiscalYearCells: reportedFiscalYears.length, verifiedReportedFiscalYearCells: fiscalVerified.length, additionalUsableReportedFiscalYearCells: additionalUsableFiscalCells.length, fiscalAiDiscrepancyCount: fiscalAiDiscrepancies.length, failuresByRootCause, economicSanityFlagCount: sanityFlags.length, auditIssueCount: auditIssues.length }, sanityFlags, auditIssues, records: filteredRecords, reportedFiscalYears, additionalUsableFiscalCells }
 
 await mkdir(outputDirectory, { recursive: true })
 const perTickerDirectory = path.join(outputDirectory, 'by-ticker')

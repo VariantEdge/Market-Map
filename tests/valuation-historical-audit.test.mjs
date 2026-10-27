@@ -24,6 +24,17 @@ test('historical audit requires exactly seven metrics across all requested actua
     .some((issue) => issue.metric === 'ebit' && issue.period === 'LTM' && issue.reason === 'MISSING_AUDIT_CELL'))
 })
 
+test('mandatory calendar cell cannot be verified from allocated fiscal quarters', () => {
+  const records = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
+  const target = records.find((item) => item.metric === 'capitalExpenditures' &&
+    item.calendarYear === '2024A')
+  Object.assign(target, { displayedValue: 45_397_032.608695656,
+    exactness: 'CALENDARIZED_ESTIMATE', validationStatus: 'VERIFIED_DERIVED' })
+  assert.ok(validateHistoricalAuditRecords(records, { tickers, metrics, periods }).some((issue) =>
+    issue.ticker === 'AAA' && issue.metric === 'capitalExpenditures' && issue.period === '2024A' &&
+    issue.reason === 'NON_EXACT_CALENDAR_VALUE'))
+})
+
 test('historical audit accepts evidenced fail-closed N/A and rejects stale generic nulls', () => {
   const base = metrics.flatMap((metric) => periods.map((period) => record(metric, period)))
   const explicit = base.map((item) => item.metric === 'revenue' && item.calendarYear === '2025A'

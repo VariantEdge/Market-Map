@@ -491,7 +491,7 @@ export default function ValuationAnalysisPage({ onBack }) {
         <div className="valuation-toolbar">
           <div className="valuation-add"><input value={addQuery} onChange={(event) => setAddQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addCompany() }} placeholder="Add ticker" /><button type="button" onClick={addCompany}>Add</button></div>
           <input className="valuation-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search company or ticker" />
-          <div className="valuation-tools"><button type="button" onClick={() => setShowColumns((open) => !open)} className={showColumns ? 'is-selected' : ''}>Columns</button><button type="button" className="is-selected" disabled title="Historical GAAP actuals use the canonical WiseSheets and SEC pipeline.">Canonical historical</button><button type="button" onClick={() => setShowAudit((open) => !open)} className={showAudit ? 'is-selected' : ''}>Data Quality</button><button type="button" onClick={() => csvDownload('valuation-analysis.csv', [[...visibleColumns.map((column) => column.label)], ...rows.map((row) => visibleColumns.map((column) => formatCell(row, column)))])}>Export CSV</button><strong>{rows.length}/{state.items.length} companies</strong></div>
+          <div className="valuation-tools"><button type="button" onClick={() => setShowColumns((open) => !open)} className={showColumns ? 'is-selected' : ''}>Columns</button><button type="button" className="is-selected" disabled title="Historical actuals are checked against SEC filings.">Canonical historical</button><button type="button" onClick={() => setShowAudit((open) => !open)} className={showAudit ? 'is-selected' : ''}>Data Quality</button><button type="button" onClick={() => csvDownload('valuation-analysis.csv', [[...visibleColumns.map((column) => column.label)], ...rows.map((row) => visibleColumns.map((column) => formatCell(row, column)))])}>Export CSV</button><strong>{rows.length}/{state.items.length} companies</strong></div>
         </div>
         {showColumns && <aside className="valuation-column-panel"><div><h2>Table columns</h2><p>Drag to reorder. Visibility and widths save to this browser.</p></div><div>{normalizeColumnOrder(state.columnOrder, columns).map((id) => {
           const column = byId[id]
@@ -506,7 +506,34 @@ export default function ValuationAnalysisPage({ onBack }) {
         </aside>}
         {error && <div className="valuation-error">Market or financial-data issue: {error}. Existing comp selections are unaffected.</div>}
         {renderTable(multipleColumns, 'Valuation Multiples', 'Enterprise-value and market-data context. NTM revenue uses Street consensus where available; derived NTM values retain cell-level provenance.', 'multiples')}
-        {renderTable(operatingColumns, 'Operating Performance', 'Historical GAAP actuals use the canonical WiseSheets + SEC pipeline: direct reported calendar-year values where available, exact calendar quarters where applicable, and overlap-weighted calendarization for off-calendar issuers. Company-defined Adjusted EBITDA LTM uses direct reported LTM, four validated standalone quarters, or an exact full-year plus current YTD less comparable prior-year YTD bridge. NTM and estimate columns retain the existing consensus methodology.', 'operating')}
+        {renderTable(operatingColumns, 'Operating Performance', 'Historical actuals are checked against SEC filings and exact economic periods. Company-defined Adjusted EBITDA LTM uses direct reported LTM, four validated standalone quarters, or an exact full-year plus current YTD less comparable prior-year YTD bridge. NTM and estimate columns retain the existing consensus methodology.', 'operating')}
+        <section className="valuation-table-section valuation-fiscal-section" aria-label="Reported fiscal-year financials">
+          <div className="valuation-table-heading"><div><span>Separate reporting basis</span><h2>Reported fiscal years</h2></div><p>FY labels follow each issuer’s filing. Dates are the exact reported boundaries; these values do not replace January–December actuals or feed the valuation multiples.</p></div>
+          <div className="valuation-table-scroll" role="region" aria-label="Reported fiscal-year table" tabIndex="0">
+            <table className="valuation-table valuation-fiscal-table"><thead><tr>{['Company', 'Ticker', 'Fiscal year', 'Reported start', 'Reported end', 'Revenue', 'Gross profit', 'EBIT', 'Operating cash flow', 'Cash Capex', 'Free cash flow', 'Adjusted EBITDA'].map((label) => <th key={label}>{label}</th>)}</tr></thead>
+              <tbody>{rows.flatMap((row) => {
+                const cells = row.reportedFiscalYears ?? []
+                const years = [...new Set(cells.map((cell) => cell.fiscalYear))].sort()
+                return years.map((year) => {
+                  const byMetric = Object.fromEntries(cells.filter((cell) => cell.fiscalYear === year).map((cell) => [cell.metric, cell]))
+                  const anchor = byMetric.revenue?.value != null ? byMetric.revenue : Object.values(byMetric).find((cell) => cell.value != null)
+                  const distinctPeriods = new Set(Object.values(byMetric).filter((cell) => cell.value != null)
+                    .map((cell) => `${cell.periodStart}|${cell.periodEnd}`))
+                  return <tr key={`${row.ticker}-${year}`}><td>{row.displayName}</td><td>{row.ticker}</td><td>FY{year}</td><td>{distinctPeriods.size > 1 ? 'Varies by cell' : anchor?.periodStart ?? '—'}</td><td>{distinctPeriods.size > 1 ? 'Varies by cell' : anchor?.periodEnd ?? '—'}</td>
+                    {['revenue', 'grossProfit', 'ebit', 'operatingCashFlow', 'capitalExpenditures', 'freeCashFlow', 'adjustedEbitda'].map((metric) => {
+                      const cell = byMetric[metric]
+                      const label = cell?.value == null ? 'N/A' : formatLargeNumber(cell.value, cell.currency)
+                      const ref = cell?.sourceRefs?.find((source) => /^https:\/\/(?:www|data)\.sec\.gov\//.test(source.sourceUrl ?? ''))
+                      const title = cell?.value == null ? cell?.calculation ?? 'Exact SEC-backed fiscal value unavailable' :
+                        `${cell.periodStart} to ${cell.periodEnd} · ${cell.status} · ${cell.calculation} · ${cell.sourceRefs.map((source) => source.accession ?? source.sourceId).join(', ')}`
+                      return <td key={metric} title={title}>{ref && cell?.value != null ? <a href={ref.sourceUrl} target="_blank" rel="noreferrer">{label}</a> : label}</td>
+                    })}</tr>
+                })
+              })}{!rows.some((row) => row.reportedFiscalYears?.length) && <tr><td colSpan={12}>Reported fiscal years will appear after a controlled financial refresh with a configured source feed.</td></tr>}</tbody>
+            </table>
+          </div>
+          <p className="valuation-note">N/A means an exact, uncontested SEC-backed fiscal-year value has not been established. Hover over a value for its period, method, and filing accessions; select it to open the filing.</p>
+        </section>
         <p className="valuation-note">Revenue, gross profit, EBIT, CFO, capex, and FCF use the canonical historical pipeline and fail closed when source coverage or definitions are incompatible. EBIT is consolidated GAAP/IFRS operating income. CALENDARIZED_ESTIMATE identifies overlap-weighted calendarization. Adjusted EBITDA remains company-defined and separately SEC sourced. N/M means the valuation denominator is zero or negative.</p>
       </section>
       {selectedCell && <aside className="valuation-source-drawer">

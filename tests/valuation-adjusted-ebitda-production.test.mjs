@@ -240,6 +240,7 @@ for (const expected of [
     const response = await getValuationRows(null, [ticker], {
       financialRefresh: true,
       snapshotRepository: repository,
+      providerMode: 'WISESHEETS',
       providerLoader: async () => ({ value: [], cache: { state: 'MISS' } }),
       marketLoader: async () => new Map([[ticker, { price: 10, previousClose: 9, currency: 'USD' }]]),
       auditedFinancialsLoader: async () => audit(),
@@ -275,6 +276,7 @@ for (const expected of [
     const normal = await getValuationRows(null, [ticker], {
       snapshotRepository: repository,
       marketLoader: async () => new Map([[ticker, { price: 10, previousClose: 9, currency: 'USD' }]]),
+      providerMode: 'WISESHEETS',
       providerLoader: async () => { throw new Error('Normal snapshot read must not acquire WiseSheets') },
       financialRowBuilder: async () => { throw new Error('Normal snapshot read must not extract EBITDA') },
       activityCounters,

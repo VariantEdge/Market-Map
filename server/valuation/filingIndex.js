@@ -12,6 +12,9 @@ export const FINANCIAL_FILING_FORMS = new Set([
   'S-1', 'S-1/A', 'F-1', 'F-1/A', '10', '10/A', '10-12B', '10-12B/A',
 ])
 
+const PERIOD_REPORT_FORMS = new Set(['10-K', '10-K/A', '10-Q', '10-Q/A',
+  '20-F', '20-F/A', '40-F', '40-F/A'])
+
 function hash(value) {
   return createHash('sha256').update(String(value)).digest('hex')
 }
@@ -66,7 +69,8 @@ function hasCompleteSubmissionRows(rows) {
   const reportDates = rows?.reportDate
   return Array.isArray(forms) && Array.isArray(accessions) && Array.isArray(reportDates) &&
     forms.length === accessions.length && forms.length === reportDates.length &&
-    forms.every((form, index) => Boolean(form && accessions[index] && reportDates[index]))
+    forms.every((form, index) => Boolean(form && accessions[index] &&
+      (!PERIOD_REPORT_FORMS.has(String(form).toUpperCase()) || reportDates[index])))
 }
 
 export async function buildFilingIndex(company, options = {}) {
