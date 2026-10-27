@@ -958,6 +958,19 @@ export function resolveFiscalAiWithSecMetric(fiscalObservations = [], secObserva
     const sec = matches[0]
     usedSec.add(sec.sourceId)
     const reconciles = valuesAgree(fiscal.normalizedValue, sec.normalizedValue)
+    // A matching provider amount corroborates SEC arithmetic; it does not
+    // replace the SEC derivation that proves the requested economic period.
+    if (reconciles && sec.reportedVsDerived === OBSERVATION_BASIS.DERIVED &&
+        sec.derivation?.exactness === 'EXACT_ARITHMETIC') {
+      return {
+        ...sec,
+        derivation: {
+          ...sec.derivation,
+          providerCorroboration: { valueSource: sourceLineage(fiscal), matches: true },
+        },
+        warnings: [...(sec.warnings ?? []), 'FISCAL_AI_VALUE_CORROBORATES_SEC_DERIVATION'],
+      }
+    }
     const record = {
       ...fiscal, issuerId: sec.issuerId, operationScope: sec.operationScope,
       periodIdentity: sec.periodIdentity,

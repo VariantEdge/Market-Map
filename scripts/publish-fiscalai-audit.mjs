@@ -4,13 +4,15 @@ import path from 'node:path'
 // Publish SEC-backed audit conclusions without copying bulk licensed provider
 // output into this public repository. A reviewer with Fiscal.ai access can
 // re-query the indexed provider observations in the local audit run.
-const [latestPath, baselinePath, testedCommit, testCount = 'unknown', priorFiscalPath] = process.argv.slice(2)
+const [latestPath, baselinePath, testedCommit, testCount = 'unknown', priorFiscalPath,
+  recentAuditPath] = process.argv.slice(2)
 if (!latestPath || !baselinePath || !testedCommit) {
-  throw new Error('Usage: node scripts/publish-fiscalai-audit.mjs LATEST_JSON BASELINE_JSON TESTED_COMMIT [TEST_COUNT] [PRIOR_FISCAL_JSON]')
+  throw new Error('Usage: node scripts/publish-fiscalai-audit.mjs LATEST_JSON BASELINE_JSON TESTED_COMMIT [TEST_COUNT] [ORIGINAL_FISCAL_JSON] [PREVIOUS_FISCAL_JSON]')
 }
 const latest = JSON.parse(await readFile(latestPath, 'utf8'))
 const baseline = JSON.parse(await readFile(baselinePath, 'utf8'))
 const priorFiscal = priorFiscalPath ? JSON.parse(await readFile(priorFiscalPath, 'utf8')) : null
+const recentAudit = recentAuditPath ? JSON.parse(await readFile(recentAuditPath, 'utf8')) : null
 if (latest.records?.length !== 336 || !Array.isArray(latest.fiscalAiDiscrepancies)) {
   throw new Error('Expected a complete 336-cell Fiscal.ai audit with discrepancy records')
 }
@@ -30,6 +32,8 @@ for (const issue of latest.auditIssues ?? []) {
 }
 function sourceReference(component, cellStatus) {
   const url = isSecUrl(component.sourceUrl) ? component.sourceUrl : null
+  const secBacked = component.sourceProvider === 'SEC' ||
+    String(component.sourceId ?? '').startsWith('SEC:')
   return {
     source: component.sourceProvider === 'Fiscal.ai' ? 'Fiscal.ai candidate reconciled to SEC' : component.sourceProvider,
     filingUrl: url,
@@ -37,8 +41,8 @@ function sourceReference(component, cellStatus) {
     periodStart: component.sourceStart ?? null,
     periodEnd: component.sourceEnd ?? null,
     role: component.role ?? null,
-    amountUsd: url && verified.has(cellStatus) ? component.sourceValue ?? null :
-      component.sourceProvider === 'SEC' ? component.sourceValue ?? null : null,
+    amountUsd: url && secBacked && verified.has(cellStatus) ? component.sourceValue ?? null : null,
+    secSourceId: secBacked ? component.sourceId ?? null : null,
     operationScope: component.operationScope ?? null,
     definitionFingerprint: component.definitionFingerprint ?? component.sourceDefinitionFingerprint ?? null,
     provenanceComplete: Boolean(url && component.sourceStart && component.sourceEnd),
@@ -48,6 +52,18 @@ function cellFromRecord(record) {
   const issueCodes = auditIssueByCell.get(cellKey(record)) ?? []
   const sources = (record.quarterlyComponents ?? []).map((component) =>
     sourceReference(component, record.validationStatus))
+  const calculationInputs = (record.calculationInputs ?? [])
+    .filter((input) => input.sourceProvider === 'SEC' && isSecUrl(input.sourceUrl))
+    .map((input) => ({
+      metric: input.metric ?? null,
+      valueUsd: input.value ?? null,
+      periodStart: input.periodStart ?? null,
+      periodEnd: input.periodEnd ?? null,
+      concept: input.concept ?? null,
+      accession: input.accession ?? accessionFromUrl(input.sourceUrl),
+      filingUrl: input.sourceUrl,
+      operationScope: input.operationScope ?? null,
+    }))
   const acceptedNa = record.displayedValue == null && issueCodes.length === 0
   const staleScopeConcern = record.ticker === 'FCEL' && record.metric === 'freeCashFlow' &&
     record.calendarYear === 'LTM' && acceptedNa &&
@@ -68,7 +84,7 @@ function cellFromRecord(record) {
       acceptedNaByCurrentValidator: acceptedNa,
       staleScopeConcern,
     },
-    sources,
+    sources, calculationInputs,
   }
 }
 const cells = latest.records.map(cellFromRecord)
@@ -129,6 +145,24 @@ const improvements = comparisons.filter((change) => !verified.has(change.previou
   verified.has(change.currentStatus))
 const changedVerifiedValues = comparisons.filter((change) => verified.has(change.previousStatus) &&
   verified.has(change.currentStatus) && change.previousValueUsd !== change.currentValueUsd)
+const recentRecords = new Map((recentAudit?.records ?? []).map((record) => [cellKey(record), record]))
+const recentChanges = recentAudit ? cells.flatMap((cell) => {
+  const before = recentRecords.get(cellKey(cell))
+  if (!before || (before.validationStatus === cell.status && before.displayedValue === cell.valueUsd)) return []
+  return [{ ticker: cell.ticker, metric: cell.metric, period: cell.period,
+    beforeStatus: before.validationStatus, beforeValueUsd: before.displayedValue ?? null,
+    afterStatus: cell.status, afterValueUsd: cell.valueUsd,
+    beforeSources: (before.quarterlyComponents ?? []).map((component) =>
+      sourceReference(component, before.validationStatus)),
+    afterSources: cell.sources,
+    explanation: verified.has(before.validationStatus) && !verified.has(cell.status)
+      ? String(cell.validationEvidence.warning ?? '').includes('PARTIAL_FISCAL_PERIOD_ALLOCATION_PROHIBITED')
+        ? 'Prior fiscal reporting period does not exactly cover January–December; value withdrawn.'
+        : 'Verification withdrawn; inspect the current source warning and period evidence.'
+      : !verified.has(before.validationStatus) && verified.has(cell.status)
+        ? 'Exact SEC period and calculation now verified.'
+        : 'Updated SEC comparative filing or provider reconciliation; inspect source periods and values.' }]
+}) : []
 const priorFiscalRecords = new Map((priorFiscal?.records ?? []).map((record) => [cellKey(record), record]))
 const branchChanges = priorFiscal ? cells.flatMap((cell) => {
   const before = priorFiscalRecords.get(cellKey(cell))
@@ -218,12 +252,23 @@ const report = {
     originalUnresolvedCells,
     originalProviderMismatches,
   } : null,
+  previousFullAudit: recentAudit ? {
+    generatedAt: recentAudit.generatedAt, summary: recentAudit.summary, changes: recentChanges,
+  } : null,
+  sourceAdjudications: [{
+    ticker: 'NBIS', metric: 'operatingCashFlow', period: '2025A',
+    finding: 'The SEC 2025 Form 20-F reports $401.9 million from continuing operations, $(17.1) million from discontinued operations, and $384.8 million total. The provider annual mapping follows the total; the canonical observation uses continuing operations. This is a scope conflict, not proof of a restatement.',
+    calculation: '401900000 + (-17100000) = 384800000',
+    filingAccession: '0001104659-26-052948',
+    filingUrl: 'https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm',
+    disposition: 'UNRESOLVED_PENDING_SCOPE_POLICY_AND_LTM_SOURCE_RECONCILIATION',
+  }],
   cells, unresolvedCells, unresolvedByRootCause, acceptedNaCells, providerMismatches,
 }
 
 const fmt = (value) => value == null ? 'N/A' : Number(value).toLocaleString('en-US')
 const fmtMillions = (value) => value == null ? 'N/A' : Number(value / 1e6).toLocaleString('en-US', { maximumFractionDigits: 3 })
-const sourceLinks = (cell) => cell.sources.filter((source) => source.filingUrl)
+const sourceLinks = (cell) => [...cell.sources, ...cell.calculationInputs].filter((source) => source.filingUrl)
   .slice(0, 2).map((source) => `[${source.accession ?? 'SEC'}](${source.filingUrl})`).join(', ') || 'No filing link in flattened record'
 const escapeTable = (value) => String(value ?? '').replaceAll('|', '\\|').replaceAll('\n', ' ')
 const markdown = []
@@ -247,6 +292,14 @@ add('# Fiscal.ai migration — independent review audit', '',
   `| npm run build | Passed |`,
   `| npm run financials:audit | ${auditPassed ? 'Passed' : 'Failed closed'}: ${unresolvedCells.length} unresolved / 336 |`, '',
   `The audit used ${latest.providerSource === 'FISCAL_AI_MCP_LOCAL_CAPTURE' ? 'Fiscal.ai MCP responses captured locally' : 'Fiscal.ai REST responses'} and SEC source checks. No production Fiscal.ai REST credential was available for this run. The complete local provider capture is **not** committed.`, '',
+  ...(recentAudit ? [
+    '## Change since the immediately previous full audit', '',
+    `The prior full run (${recentAudit.generatedAt}) had ${recentAudit.summary.VERIFIED_REPORTED + recentAudit.summary.VERIFIED_DERIVED} verified, ${recentAudit.summary.acceptedNaCellsWithEvidence} accepted N/As, and ${recentAudit.summary.unresolvedCellCount} unresolved. This run has ${latest.summary.VERIFIED_REPORTED + latest.summary.VERIFIED_DERIVED} verified, ${acceptedNaCells.length} accepted N/As, and ${unresolvedCells.length} unresolved.`, '',
+    '| Ticker | Metric | Period | Before | Before USD | After | After USD | Source accessions | Explanation |',
+    '| --- | --- | --- | --- | ---: | --- | ---: | --- | --- |',
+    ...recentChanges.map((change) => `| ${change.ticker} | ${change.metric} | ${change.period} | ${change.beforeStatus} | ${fmt(change.beforeValueUsd)} | ${change.afterStatus} | ${fmt(change.afterValueUsd)} | ${(change.afterSources.length ? change.afterSources : change.beforeSources).map((source) => source.accession).filter(Boolean).join(', ') || 'See machine audit'} | ${change.explanation} |`),
+    '',
+  ] : []),
   ...(priorFiscal ? [
     '## Change since the previous published Fiscal.ai audit', '',
     `The previous review-branch audit (${priorFiscal.generatedAt}) had ${priorFiscal.summary.VERIFIED_REPORTED + priorFiscal.summary.VERIFIED_DERIVED} verified, ${priorFiscal.summary.acceptedNaCellsWithEvidence} accepted N/As, ${priorFiscal.summary.unresolvedCellCount} unresolved, and ${priorFiscal.summary.fiscalAiDiscrepancyCount} underlying observation conflicts. The current run has ${latest.summary.VERIFIED_REPORTED + latest.summary.VERIFIED_DERIVED} verified, ${acceptedNaCells.length} accepted N/As, ${unresolvedCells.length} unresolved, and ${providerMismatches.length} conflicts.`,
@@ -283,6 +336,8 @@ for (const [ticker, metric, period] of originalNine) {
   add(`| ${ticker} ${metric} ${period} | ${fmtMillions(cell.valueUsd)} | ${cell.status} | ${escapeTable(sourceMath)} |`)
 }
 add('',
+  '## NBIS 2025 operating cash flow source conflict', '',
+  'The [2025 SEC Form 20-F](https://www.sec.gov/Archives/edgar/data/1513845/000110465926052948/nbis-20251231x20f.htm) (accession `0001104659-26-052948`) reports $401.9 million from continuing operations and $(17.1) million from discontinued operations; $401.9 million + $(17.1) million = $384.8 million total. Fiscal.ai’s annual standardized mapping corresponds to the reported total, while the canonical engine selects continuing operations. The 2025A and LTM OCF cells remain unresolved until the scope policy and LTM sources are reconciled. This is a scope difference, not evidence of a restatement.', '',
   'IREN source accessions: [FY23 comparative 0001878848-25-000063](https://www.sec.gov/Archives/edgar/data/1878848/000187884825000063/iren-20250630.htm), [H2 CY23 0001878848-25-000009](https://www.sec.gov/Archives/edgar/data/1878848/000187884825000009/iren-20241231_d2.htm), [H2 CY22 0001140361-24-008183](https://www.sec.gov/Archives/edgar/data/1878848/000114036124008183/ef20015356_ex99-3.htm), [FY24/FY25 comparative 0001878848-26-000052](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000052/iren-20260630.htm), and [H2 CY24/CY25 0001878848-26-000015](https://www.sec.gov/Archives/edgar/data/1878848/000187884826000015/iren-20251231.htm). MU August fiscal-year filings: [0000723125-25-000028](https://www.sec.gov/Archives/edgar/data/723125/000072312525000028/mu-20250828.htm) and [0000723125-26-000023](https://www.sec.gov/Archives/edgar/data/723125/000072312526000023/mu-20260903.htm).', '',
   '## Comparison with prior WiseSheets-based audit', '',
   `The cached ${baseline.generatedAt} WiseSheets/SEC run had ${baseline.summary.VERIFIED_REPORTED} reported, ${baseline.summary.VERIFIED_DERIVED} derived, ${baseline.summary.acceptedNaCellsWithEvidence} accepted N/As, and ${baseline.summary.unresolvedCellCount} unresolved. The current run has ${regressions.length} verified-to-nonverified transitions and ${changedVerifiedValues.length} changed verified values. Dates and newest LTM endpoints differ, so changed LTM values are not automatically provider errors. The earlier “nine unresolved” figure was a separate historical audit state; it is not this immediate baseline.`, '',
@@ -309,9 +364,17 @@ add('', `## Validator-accepted N/A cells — all ${acceptedNaCells.length}`, '',
 for (const cell of acceptedNaCells) {
   const definitions = [...new Set(cell.sources.map((source) => source.definitionFingerprint).filter(Boolean))]
   const scopes = [...new Set(cell.sources.map((source) => source.operationScope).filter(Boolean))]
+  const search = cell.validationEvidence.negativeSearchEvidence
+  const calendarSearch = cell.validationEvidence.nullEvidence?.sourceSearchCompleteness
   const evidence = cell.status === 'DEFINITION_INCOMPATIBLE'
     ? `${definitions.length} distinct source fingerprints; ${sourceLinks(cell)}`
-    : `${scopes.join(' versus ')}; ${sourceLinks(cell)}`
+    : cell.status === 'OPERATION_SCOPE_INCOMPATIBLE'
+      ? `${scopes.join(' versus ')}; ${sourceLinks(cell)}`
+      : cell.status === 'NOT_REPORTED' && search?.completed === true
+        ? `Completed SEC filing search, ${search.filingsExamined?.length ?? 0} filings, zero eligible reconciliations for ${cell.period}; accessions: ${(search.filingsExamined ?? []).map((item) => item.accessionNumber).join(', ')}`
+        : cell.status === 'LEGITIMATE_NA' && calendarSearch?.completed === true
+          ? `Completed exact-calendar SEC period/concept search, ${calendarSearch.selectedRelevantFilingCount} filings; no exact Jan–Dec construction. Accessions: ${(calendarSearch.relevantAccessions ?? []).join(', ')}`
+          : `${cell.validationEvidence.warning ?? 'Evidence in machine-readable audit'}; ${sourceLinks(cell)}`
   add(`| ${cell.ticker} | ${cell.metric} | ${cell.period} | ${cell.status} | ${escapeTable(evidence)} |`)
 }
 if (staleAcceptedNaCount) add('', '**FCEL LTM FCF caveat:** the current validator accepts its scope-conflict components, but their period ends are in 2018. They do not establish the current LTM scope. Treat this cell as requiring review; do not use the accepted-N/A count as evidence that all accepted N/As are defensible.')

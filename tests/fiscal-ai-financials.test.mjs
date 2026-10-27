@@ -162,6 +162,33 @@ test('Fiscal reported mapping retains filing accession, source components, and p
   assert.equal(urlFilled.records[0].accession, '0001996810-26-000015')
 })
 
+test('matching Fiscal gross profit preserves exact SEC revenue-minus-cost arithmetic', () => {
+  const period = { periodType: PERIOD_TYPE.FISCAL_YEAR, periodStart: '2023-01-01',
+    periodEnd: '2023-12-31', fiscalYear: 2023, dateAuthority: DATE_AUTHORITY.REPORTED }
+  const input = { issuerId: 'AMZN', scope: 'CONSOLIDATED', operationScope: 'UNSPECIFIED',
+    currency: 'USD', normalizedUnits: 'USD', periodIdentity: period,
+    reportedVsDerived: OBSERVATION_BASIS.REPORTED }
+  const sec = { ...secObservation('AMZN', 'grossProfit', 270_046_000_000,
+    '2023-01-01', '2023-12-31', PERIOD_TYPE.FISCAL_YEAR),
+  reportedVsDerived: OBSERVATION_BASIS.DERIVED,
+  derivation: { method: 'REVENUE_MINUS_COST_OF_REVENUE', exactness: 'EXACT_ARITHMETIC',
+    inputs: [{ ...input, metric: 'revenue' }, { ...input, metric: 'costOfRevenue' }] } }
+  const fiscal = { ...sec, sourceProvider: 'Fiscal.ai', sourceId: 'Fiscal.ai:AMZN:2023-gross-profit',
+    derivation: { method: 'FISCAL_STANDARDIZED_MAPPING' } }
+  const matched = resolveFiscalAiWithSecMetric([fiscal], [sec], 'grossProfit')
+  assert.equal(matched.records.length, 1)
+  assert.equal(matched.records[0].sourceProvider, 'SEC')
+  assert.equal(matched.records[0].derivation.method, 'REVENUE_MINUS_COST_OF_REVENUE')
+  assert.equal(matched.records[0].derivation.providerCorroboration.valueSource.sourceId, fiscal.sourceId)
+  const calendar = buildCalendarYear(matched.records, 2023)
+  assert.equal(calendar.value, 270_046_000_000)
+  assert.equal(calendar.derivation, 'REVENUE_MINUS_COST_OF_REVENUE')
+  assert.equal(calendar.calculationInputs.length, 2)
+  const conflicting = resolveFiscalAiWithSecMetric([{ ...fiscal, normalizedValue: 300_000_000_000 }],
+    [sec], 'grossProfit')
+  assert.equal(conflicting.records[0].deduplicationStatus, 'REQUIRES_REVIEW')
+})
+
 test('GEV source-backed $42m adjusted EBITDA disagreement remains a diagnostic, not a provider override', () => {
   const source = { ticker: 'GEV', companyKey: 'NYSE_GEV', adjustedMetrics: { data: [
     { periodId: 'GEV-LTM-2026-06-30', periodType: 'LTM', reportDate: '2026-06-30',

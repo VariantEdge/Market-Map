@@ -51,12 +51,6 @@ function calendarRange(year) {
   return { start: `${year}-01-01`, end: `${year}-12-31` }
 }
 
-function nearBoundary(actual, expected, tolerance = 7) {
-  const left = epochDay(actual)
-  const right = epochDay(expected)
-  return left != null && right != null && Math.abs(left - right) <= tolerance
-}
-
 function directCalendarYearCandidate(observation, year) {
   const period = observation.periodIdentity
   if (!hasAuthoritativeBoundaries(period) || period.dateAuthority !== DATE_AUTHORITY.REPORTED ||
@@ -65,8 +59,8 @@ function directCalendarYearCandidate(observation, year) {
   if (period.periodType === PERIOD_TYPE.CALENDAR_YEAR) {
     return period.periodStart === calendar.start && period.periodEnd === calendar.end
   }
-  if (period.periodType !== PERIOD_TYPE.FISCAL_YEAR || period.durationDays < 350 || period.durationDays > 378) return false
-  return nearBoundary(period.periodStart, calendar.start) && nearBoundary(period.periodEnd, calendar.end)
+  return period.periodType === PERIOD_TYPE.FISCAL_YEAR &&
+    period.periodStart === calendar.start && period.periodEnd === calendar.end
 }
 
 function coverageAnalysis(observations, year) {
@@ -160,8 +154,8 @@ function exactDerivedCalendarYearCandidate(observation, year) {
   const calendar = calendarRange(year)
   const exactAnnualPeriod = (period.periodType === PERIOD_TYPE.CALENDAR_YEAR &&
       period.periodStart === calendar.start && period.periodEnd === calendar.end) ||
-    (period.periodType === PERIOD_TYPE.FISCAL_YEAR && period.durationDays >= 350 && period.durationDays <= 378 &&
-      nearBoundary(period.periodStart, calendar.start) && nearBoundary(period.periodEnd, calendar.end))
+    (period.periodType === PERIOD_TYPE.FISCAL_YEAR &&
+      period.periodStart === calendar.start && period.periodEnd === calendar.end)
   if (!exactAnnualPeriod) return false
   return inputs.every((input) => input.issuerId === observation.issuerId && input.scope === observation.scope &&
     input.operationScope === observation.operationScope && input.currency === observation.currency &&
@@ -317,6 +311,8 @@ export function buildCalendarYear(observations = [], year, { sourceSearchComplet
       classification: CY_CLASSIFICATION.EXACT_DERIVED_CALENDAR_YEAR,
       status: HISTORICAL_RESULT_STATUS.VERIFIED_DERIVED,
       reason: null,
+      derivation: item.derivation.method,
+      calculationInputs: item.derivation.inputs,
       components: [sourceComponent({ observation: item, overlapStart: null, overlapEnd: null }, false)],
       coverage: { complete: true, gaps: [], overlaps: [], totalDays: inclusiveDays(`${normalizedYear}-01-01`, `${normalizedYear}-12-31`) },
     }
