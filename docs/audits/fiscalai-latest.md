@@ -1,7 +1,7 @@
 # Fiscal.ai migration — independent review audit
 
-- **Tested implementation commit:** `a6dd68d48a667a9c8bd0f76ac596b1f8cadab7f4`
-- **Audit generated:** 2026-10-27T06:32:23.913Z
+- **Tested implementation commit:** `ca308d0fc8bfa20a200e6d70643ec8cfb75b0f75`
+- **Audit generated:** 2026-10-27T19:10:58.728Z
 - **Scope:** 12 companies × 7 metrics × 4 periods = 336 cells.
 
 This is a review branch. The audit **fails**; these results must not be promoted to production snapshots without separate approval.
@@ -15,11 +15,80 @@ This is a review branch. The audit **fails**; these results must not be promoted
 - Fiscal.ai-versus-SEC observation conflicts: **37** (underlying observations, not 336 final cells)
 - Economic sanity flags: **4**
 
+### Separate reported fiscal-year view
+
+- Exact SEC-backed FY cells across 2023–2025: **227 / 252** (168 reported; 59 derived).
+- Additional usable FY cells whose corresponding Jan–Dec cell remains unresolved: **59**.
+
+These are independent period identities. No FY amount has been substituted into the 336-cell January–December audit or its valuation denominators.
+
+| Ticker | Metric | FY | FY USD | Reported start | Reported end | Jan–Dec status | SEC accessions |
+| --- | --- | --- | ---: | --- | --- | --- | --- |
+| FCEL | revenue | FY2023 | 123,394,000 | 2022-11-01 | 2023-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | grossProfit | FY2023 | -10,535,000 | 2022-11-01 | 2023-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | ebit | FY2023 | -136,084,000 | 2022-11-01 | 2023-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | operatingCashFlow | FY2023 | -140,250,000 | 2022-11-01 | 2023-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | capitalExpenditures | FY2023 | 39,355,000 | 2022-11-01 | 2023-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | freeCashFlow | FY2023 | -179,605,000 | 2022-11-01 | 2023-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | adjustedEbitda | FY2023 | -102,882,000 | 2022-11-01 | 2023-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001558370-23-019891 |
+| FCEL | revenue | FY2024 | 112,132,000 | 2023-11-01 | 2024-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | grossProfit | FY2024 | -35,918,000 | 2023-11-01 | 2024-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | ebit | FY2024 | -158,488,000 | 2023-11-01 | 2024-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | operatingCashFlow | FY2024 | -152,906,000 | 2023-11-01 | 2024-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | capitalExpenditures | FY2024 | 47,721,000 | 2023-11-01 | 2024-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | freeCashFlow | FY2024 | -200,627,000 | 2023-11-01 | 2024-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | adjustedEbitda | FY2024 | -101,111,000 | 2023-11-01 | 2024-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122295 |
+| FCEL | revenue | FY2025 | 158,162,000 | 2024-11-01 | 2025-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | grossProfit | FY2025 | -26,408,000 | 2024-11-01 | 2025-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | ebit | FY2025 | -192,348,000 | 2024-11-01 | 2025-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | operatingCashFlow | FY2025 | -125,291,000 | 2024-11-01 | 2025-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | capitalExpenditures | FY2025 | 18,601,000 | 2024-11-01 | 2025-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | freeCashFlow | FY2025 | -143,892,000 | 2024-11-01 | 2025-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122302 |
+| FCEL | adjustedEbitda | FY2025 | -74,441,000 | 2024-11-01 | 2025-10-31 | INSUFFICIENT_PERIOD_COVERAGE | 0001104659-25-122295 |
+| INTC | revenue | FY2023 | 54,228,000,000 | 2023-01-01 | 2023-12-30 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | grossProfit | FY2023 | 21,711,000,000 | 2023-01-01 | 2023-12-30 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | ebit | FY2023 | 93,000,000 | 2023-01-01 | 2023-12-30 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | operatingCashFlow | FY2023 | 11,471,000,000 | 2023-01-01 | 2023-12-30 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | capitalExpenditures | FY2023 | 25,750,000,000 | 2023-01-01 | 2023-12-30 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | freeCashFlow | FY2023 | -14,279,000,000 | 2023-01-01 | 2023-12-30 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | revenue | FY2024 | 53,101,000,000 | 2023-12-31 | 2024-12-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | grossProfit | FY2024 | 17,345,000,000 | 2023-12-31 | 2024-12-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | ebit | FY2024 | -11,678,000,000 | 2023-12-31 | 2024-12-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | operatingCashFlow | FY2024 | 8,288,000,000 | 2023-12-31 | 2024-12-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | capitalExpenditures | FY2024 | 23,944,000,000 | 2023-12-31 | 2024-12-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | freeCashFlow | FY2024 | -15,656,000,000 | 2023-12-31 | 2024-12-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | revenue | FY2025 | 52,853,000,000 | 2024-12-29 | 2025-12-27 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | grossProfit | FY2025 | 18,375,000,000 | 2024-12-29 | 2025-12-27 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | ebit | FY2025 | -2,214,000,000 | 2024-12-29 | 2025-12-27 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | operatingCashFlow | FY2025 | 9,697,000,000 | 2024-12-29 | 2025-12-27 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | capitalExpenditures | FY2025 | 14,646,000,000 | 2024-12-29 | 2025-12-27 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| INTC | freeCashFlow | FY2025 | -4,949,000,000 | 2024-12-29 | 2025-12-27 | INSUFFICIENT_PERIOD_COVERAGE | 0000050863-26-000011 |
+| MU | revenue | FY2023 | 15,540,000,000 | 2022-09-02 | 2023-08-31 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-25-000028 |
+| MU | grossProfit | FY2023 | -1,416,000,000 | 2022-09-02 | 2023-08-31 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-25-000028 |
+| MU | ebit | FY2023 | -5,745,000,000 | 2022-09-02 | 2023-08-31 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-25-000028 |
+| MU | operatingCashFlow | FY2023 | 1,559,000,000 | 2022-09-02 | 2023-08-31 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-25-000028 |
+| MU | capitalExpenditures | FY2023 | 7,676,000,000 | 2022-09-02 | 2023-08-31 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-25-000028 |
+| MU | freeCashFlow | FY2023 | -6,117,000,000 | 2022-09-02 | 2023-08-31 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-25-000028 |
+| MU | revenue | FY2024 | 25,111,000,000 | 2023-09-01 | 2024-08-29 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | grossProfit | FY2024 | 5,613,000,000 | 2023-09-01 | 2024-08-29 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | ebit | FY2024 | 1,304,000,000 | 2023-09-01 | 2024-08-29 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | operatingCashFlow | FY2024 | 8,507,000,000 | 2023-09-01 | 2024-08-29 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | capitalExpenditures | FY2024 | 8,386,000,000 | 2023-09-01 | 2024-08-29 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | freeCashFlow | FY2024 | 121,000,000 | 2023-09-01 | 2024-08-29 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | revenue | FY2025 | 37,378,000,000 | 2024-08-30 | 2025-08-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | grossProfit | FY2025 | 14,873,000,000 | 2024-08-30 | 2025-08-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | ebit | FY2025 | 9,770,000,000 | 2024-08-30 | 2025-08-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | operatingCashFlow | FY2025 | 17,525,000,000 | 2024-08-30 | 2025-08-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | capitalExpenditures | FY2025 | 15,857,000,000 | 2024-08-30 | 2025-08-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| MU | freeCashFlow | FY2025 | 1,668,000,000 | 2024-08-30 | 2025-08-28 | INSUFFICIENT_PERIOD_COVERAGE | 0000723125-26-000023 |
+| IREN | grossProfit | FY2023 | 36,090,000 | 2022-07-01 | 2023-06-30 | INSUFFICIENT_PERIOD_COVERAGE | 0001878848-25-000063 |
+| IREN | grossProfit | FY2024 | 100,125,000 | 2023-07-01 | 2024-06-30 | INSUFFICIENT_PERIOD_COVERAGE | 0001878848-26-000052 |
+
 ### Verification
 
 | Check | Result |
 | --- | --- |
-| npm test | 502 passed, 0 failed |
+| npm test | 513 passed, 0 failed |
 | npm run lint | Passed |
 | npm run typecheck | Passed |
 | npm run build | Passed |
@@ -29,38 +98,12 @@ The audit used Fiscal.ai MCP responses captured locally and SEC source checks. N
 
 ## Change since the immediately previous full audit
 
-The prior full run (2026-10-25T23:02:07.723Z) had 256 verified, 7 accepted N/As, and 73 unresolved. This run has 241 verified, 7 accepted N/As, and 88 unresolved.
+The prior full run (2026-10-27T07:08:44.328Z) had 241 verified, 7 accepted N/As, and 88 unresolved. This run has 241 verified, 7 accepted N/As, and 88 unresolved.
 
 | Ticker | Metric | Period | Before | Before USD | After | After USD | Source accessions | Explanation |
 | --- | --- | --- | --- | ---: | --- | ---: | --- | --- |
-| INTC | revenue | 2023A | VERIFIED_REPORTED | 54,228,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-24-000076, 0000050863-24-000124, 0000050863-24-000149, 0000050863-26-000011, 0000050863-25-000074 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | revenue | 2024A | VERIFIED_REPORTED | 53,101,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-25-000074, 0000050863-25-000109, 0000050863-25-000179, 0000050863-26-000011, 0000050863-26-000079 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | revenue | 2025A | VERIFIED_REPORTED | 52,853,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-26-000079, 0000050863-26-000157, 0000050863-25-000179, 0000050863-26-000011, 0000050863-26-000079 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | grossProfit | 2023A | VERIFIED_REPORTED | 21,711,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-24-000076, 0000050863-24-000124, 0000050863-24-000149, 0000050863-26-000011, 0000050863-25-000074 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | grossProfit | 2024A | VERIFIED_REPORTED | 17,345,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-25-000074, 0000050863-25-000109, 0000050863-25-000179, 0000050863-26-000011, 0000050863-26-000079 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | grossProfit | 2025A | VERIFIED_REPORTED | 18,375,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-26-000079, 0000050863-26-000157, 0000050863-25-000179, 0000050863-26-000011, 0000050863-26-000079 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | ebit | 2023A | VERIFIED_REPORTED | 93,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-24-000076, 0000050863-24-000124, 0000050863-24-000149, 0000050863-26-000011, 0000050863-25-000074 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | ebit | 2024A | VERIFIED_REPORTED | -11,678,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-25-000074, 0000050863-25-000109, 0000050863-25-000179, 0000050863-26-000011, 0000050863-26-000079 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | ebit | 2025A | VERIFIED_REPORTED | -2,214,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-26-000079, 0000050863-26-000157, 0000050863-25-000179, 0000050863-26-000011, 0000050863-26-000079 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | operatingCashFlow | 2023A | VERIFIED_REPORTED | 11,471,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-24-000076, 0000050863-24-000124, 0000050863-24-000149, 0000050863-26-000011, 0000050863-25-000074 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | operatingCashFlow | 2024A | VERIFIED_REPORTED | 8,288,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-25-000074, 0000050863-25-000109, 0000050863-25-000179, 0000050863-26-000011, 0000050863-26-000079 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | operatingCashFlow | 2025A | VERIFIED_REPORTED | 9,697,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-26-000079, 0000050863-26-000157, 0000050863-25-000179, 0000050863-26-000011, 0000050863-26-000079 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | capitalExpenditures | 2023A | VERIFIED_REPORTED | 25,750,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-24-000076, 0000050863-24-000124, 0000050863-24-000149, 0000050863-26-000011, 0000050863-25-000074 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | capitalExpenditures | 2024A | VERIFIED_REPORTED | 23,944,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-25-000074, 0000050863-25-000109, 0000050863-25-000179, 0000050863-26-000011, 0000050863-26-000079 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | capitalExpenditures | 2025A | VERIFIED_REPORTED | 14,646,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | 0000050863-26-000079, 0000050863-26-000157, 0000050863-25-000179, 0000050863-26-000011, 0000050863-26-000079 | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | freeCashFlow | 2023A | VERIFIED_DERIVED | -14,279,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | See machine audit | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | freeCashFlow | 2024A | VERIFIED_DERIVED | -15,656,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | See machine audit | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| INTC | freeCashFlow | 2025A | VERIFIED_DERIVED | -4,949,000,000 | INSUFFICIENT_PERIOD_COVERAGE | N/A | See machine audit | Prior fiscal reporting period does not exactly cover January–December; value withdrawn. |
-| CRWV | grossProfit | 2023A | INSUFFICIENT_PERIOD_COVERAGE | N/A | VERIFIED_DERIVED | 160,000,000 | 0001769628-26-000104 | Exact SEC period and calculation now verified. |
-| CRWV | grossProfit | 2024A | VERIFIED_DERIVED | 1,422,076,000 | VERIFIED_DERIVED | 1,422,000,000 | 0001769628-26-000104 | Updated SEC comparative filing or provider reconciliation; inspect source periods and values. |
-| CRWV | grossProfit | 2025A | VERIFIED_DERIVED | 3,677,641,000 | VERIFIED_DERIVED | 3,678,000,000 | 0001769628-26-000104 | Updated SEC comparative filing or provider reconciliation; inspect source periods and values. |
-| CRWV | adjustedEbitda | 2023A | INSUFFICIENT_PERIOD_COVERAGE | N/A | VERIFIED_REPORTED | 103,913,000 | 0001193125-25-044231 | Exact SEC period and calculation now verified. |
-| CRWV | adjustedEbitda | 2024A | VERIFIED_REPORTED | 1,219,000,000 | VERIFIED_REPORTED | 1,219,258,000 | 0001193125-25-044231 | Updated SEC comparative filing or provider reconciliation; inspect source periods and values. |
-| IREN | grossProfit | LTM | VERIFIED_DERIVED | 487,339,000 | VERIFIED_DERIVED | 487,301,000 | 0001878848-26-000052 | Updated SEC comparative filing or provider reconciliation; inspect source periods and values. |
-| IREN | capitalExpenditures | LTM | VERIFIED_DERIVED | 4,333,164,000 | VERIFIED_DERIVED | 4,333,087,000 | 0001878848-26-000052 | Updated SEC comparative filing or provider reconciliation; inspect source periods and values. |
-| AMZN | grossProfit | 2023A | INSUFFICIENT_PERIOD_COVERAGE | N/A | VERIFIED_DERIVED | 270,046,000,000 | 0001018724-26-000004 | Exact SEC period and calculation now verified. |
-| META | grossProfit | 2024A | VERIFIED_DERIVED | 134,338,000,000 | VERIFIED_DERIVED | 134,340,000,000 | 0001628280-26-003942 | Updated SEC comparative filing or provider reconciliation; inspect source periods and values. |
-| META | grossProfit | 2025A | VERIFIED_DERIVED | 164,790,000,000 | VERIFIED_DERIVED | 164,791,000,000 | 0001628280-26-003942 | Updated SEC comparative filing or provider reconciliation; inspect source periods and values. |
+| IREN | capitalExpenditures | 2023A | VERIFIED_DERIVED | 125,426,000 | VERIFIED_DERIVED | 115,423,000 | 0001878848-25-000063, 0001878848-25-000009, 0001140361-24-008183 | Updated SEC comparative filing or provider reconciliation; inspect source periods and values. |
+| IREN | freeCashFlow | 2023A | VERIFIED_DERIVED | -167,868,000 | VERIFIED_DERIVED | -157,865,000 | See machine audit | Updated SEC comparative filing or provider reconciliation; inspect source periods and values. |
 
 ## Change since the previous published Fiscal.ai audit
 
