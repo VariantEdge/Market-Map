@@ -127,6 +127,12 @@
 @keyframes valuation-skeleton { from { background-position: 180% 0; } to { background-position: -20% 0; } }
 @media (prefers-reduced-motion: reduce) { .valuation-cell-skeleton { animation: none; } }
 .valuation-note { margin: 8px 1px 0; color: var(--va-faint); font-size: 10px; line-height: 1.45; }
+.valuation-fiscal-section { margin-top: 22px; }
+.valuation-fiscal-table { min-width: 1460px; }
+.valuation-fiscal-table thead th { padding: 11px 10px; color: #b9cede; font-size: 10px; text-align: left; white-space: nowrap; }
+.valuation-fiscal-table tbody td { padding: 9px 10px; white-space: nowrap; }
+.valuation-fiscal-table a { color: #83d6fa; text-decoration: none; }
+.valuation-fiscal-table a:hover { text-decoration: underline; }
 
 .valuation-source-drawer { position: fixed; z-index: 60; top: 0; right: 0; bottom: 0; width: min(420px, 92vw); overflow: auto; padding: 22px; border-left: 1px solid var(--va-border-strong); background: #0b141f; box-shadow: -24px 0 60px rgba(0, 0, 0, .42); }
 .valuation-source-drawer > button { float: right; border: 1px solid var(--va-border); border-radius: 3px; background: transparent; color: #c5d3e1; cursor: pointer; font: inherit; font-size: 10px; padding: 5px 8px; }

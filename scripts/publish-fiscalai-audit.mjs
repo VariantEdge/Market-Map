@@ -90,6 +90,22 @@ function cellFromRecord(record) {
 const cells = latest.records.map(cellFromRecord)
 const unresolvedCells = cells.filter((cell) => cell.validationEvidence.auditIssues.length)
 const acceptedNaCells = cells.filter((cell) => cell.validationEvidence.acceptedNaByCurrentValidator)
+const fiscalCells = (latest.reportedFiscalYears ?? []).map((cell) => ({
+  ticker: cell.ticker, metric: cell.metric, fiscalYear: cell.fiscalYear,
+  periodStart: cell.periodStart, periodEnd: cell.periodEnd,
+  valueUsd: cell.value, status: cell.status, calculation: cell.calculation,
+  currency: cell.currency, operationScope: cell.operationScope ?? null,
+  sources: (cell.sourceRefs ?? []).filter((source) => isSecUrl(source.sourceUrl))
+    .map((source) => ({ accession: source.accession ?? accessionFromUrl(source.sourceUrl),
+      filingUrl: source.sourceUrl, sourceId: source.sourceId, periodStart: source.periodStart,
+      periodEnd: source.periodEnd, amountUsd: source.value })),
+  calculationInputs: (cell.calculationInputs ?? []).map((input) => ({
+    metric: input.metric ?? null, valueUsd: input.value ?? null,
+    periodStart: input.periodStart ?? null, periodEnd: input.periodEnd ?? null,
+  })),
+}))
+const additionalFiscalCells = fiscalCells.filter((cell) => cell.valueUsd != null &&
+  auditIssueByCell.has(`${cell.ticker}|${cell.metric}|${cell.fiscalYear}A`))
 const unresolvedByRootCause = Object.groupBy(unresolvedCells,
   (cell) => cell.validationEvidence.rootCause ?? 'Unclassified audit failure')
 const staleAcceptedNaCount = acceptedNaCells.filter((cell) =>
@@ -232,7 +248,7 @@ const originalUnresolvedCells = (priorFiscal?.records ?? [])
     sources: (record.quarterlyComponents ?? []).map((component) =>
       sourceReference(component, record.validationStatus)) }))
 const report = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   repository: 'VariantEdge/Market-Map', branch: 'review/fiscalai-migration',
   testedImplementationCommit: testedCommit,
   generatedFromAuditAt: latest.generatedAt,
@@ -264,6 +280,8 @@ const report = {
     disposition: 'UNRESOLVED_PENDING_SCOPE_POLICY_AND_LTM_SOURCE_RECONCILIATION',
   }],
   cells, unresolvedCells, unresolvedByRootCause, acceptedNaCells, providerMismatches,
+  reportedFiscalYearCells: fiscalCells,
+  additionalUsableReportedFiscalYearCells: additionalFiscalCells,
 }
 
 const fmt = (value) => value == null ? 'N/A' : Number(value).toLocaleString('en-US')
@@ -285,6 +303,16 @@ add('# Fiscal.ai migration — independent review audit', '',
   `- Unresolved: **${unresolvedCells.length}**`,
   `- Fiscal.ai-versus-SEC observation conflicts: **${providerMismatches.length}** (underlying observations, not 336 final cells)`,
   `- Economic sanity flags: **${latest.summary.economicSanityFlagCount}**`, '',
+  '### Separate reported fiscal-year view', '',
+  `- Exact SEC-backed FY cells across 2023–2025: **${fiscalCells.filter((cell) => cell.valueUsd != null).length} / ${fiscalCells.length}** (${fiscalCells.filter((cell) => cell.status === 'VERIFIED_REPORTED').length} reported; ${fiscalCells.filter((cell) => cell.status === 'VERIFIED_DERIVED').length} derived).`,
+  `- Additional usable FY cells whose corresponding Jan–Dec cell remains unresolved: **${additionalFiscalCells.length}**.`,
+  '', 'These are independent period identities. No FY amount has been substituted into the 336-cell January–December audit or its valuation denominators.', '',
+  '| Ticker | Metric | FY | FY USD | Reported start | Reported end | Jan–Dec status | SEC accessions |',
+  '| --- | --- | --- | ---: | --- | --- | --- | --- |',
+  ...additionalFiscalCells.map((cell) => {
+    const calendar = cells.find((item) => item.ticker === cell.ticker && item.metric === cell.metric && item.period === `${cell.fiscalYear}A`)
+    return `| ${cell.ticker} | ${cell.metric} | FY${cell.fiscalYear} | ${fmt(cell.valueUsd)} | ${cell.periodStart} | ${cell.periodEnd} | ${calendar?.status ?? 'UNAVAILABLE'} | ${[...new Set(cell.sources.map((source) => source.accession).filter(Boolean))].join(', ') || 'SEC lineage in machine report'} |`
+  }), '',
   '### Verification', '',
   `| Check | Result |`, `| --- | --- |`,
   `| npm test | ${testCount} passed, 0 failed |`,

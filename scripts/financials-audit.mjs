@@ -14,6 +14,7 @@ import {
   compareFiscalAdjustedEbitda, fetchFiscalAiHistorical, fiscalAdjustedEbitdaCandidates,
 } from '../server/valuation/fiscalAiFinancials.js'
 import { validateHistoricalAuditRecords } from '../server/valuation/historicalAuditValidation.js'
+import { buildReportedFiscalYears } from '../server/valuation/reportedFiscalYears.js'
 
 const DEFAULT_TICKERS = ['BE', 'GEV', 'FCEL', 'INTC', 'MU', 'NBIS', 'CRWV', 'IREN', 'GOOGL', 'AMZN', 'META', 'MSFT']
 const VALID_METRICS = [
@@ -88,6 +89,7 @@ const outputDirectory = path.join(process.cwd(), '.cache', 'financial-audits')
 const manifestFilename = path.join(outputDirectory, 'manifest.json')
 const previousManifest = await readJson(manifestFilename, {})
 const records = []
+const reportedFiscalYears = []
 const companyResults = []
 const providerMode = option('--provider') === 'wisesheets' ? 'WISESHEETS' : 'FISCAL_AI'
 const fiscalFixtureDirectory = option('--fiscal-fixture-dir') ?? process.env.FISCAL_AI_AUDIT_FIXTURE_DIR
@@ -294,6 +296,9 @@ for (const [tickerIndex, ticker] of requestedTickers.entries()) {
       sourceSearchEvidence: supplemental.sourceSearchEvidence,
     })
     const canonical = production.canonical
+    reportedFiscalYears.push(...buildReportedFiscalYears({
+      ticker, canonical, adjustedEbitda: ledger.adjustedEbitda, years,
+    }))
     if (providerMode === 'FISCAL_AI') {
       for (const [metric, observations] of Object.entries(canonical.records ?? {})) {
         for (const observation of observations ?? []) {
@@ -377,12 +382,16 @@ const auditIssues = changedOnly || statusOption ? [] : validateHistoricalAuditRe
   tickers: requestedTickers, metrics, periods: [...years.map((year) => `${year}A`), 'LTM'],
 })
 const auditIssueCells = new Set(auditIssues.map((issue) => `${issue.ticker}|${issue.metric}|${issue.period}`))
+const fiscalVerified = reportedFiscalYears.filter((cell) => cell.value != null &&
+  ['VERIFIED_REPORTED', 'VERIFIED_DERIVED'].includes(cell.status))
+const additionalUsableFiscalCells = fiscalVerified.filter((cell) =>
+  auditIssueCells.has(`${cell.ticker}|${cell.metric}|${cell.fiscalYear}A`))
 const acceptedNaCellsWithEvidence = changedOnly || statusOption ? 0 : records.filter((record) =>
   record.displayedValue == null && !auditIssueCells.has(`${record.ticker}|${record.metric}|${record.calendarYear}`)).length
 const report = { generatedAt: new Date().toISOString(), providerMode,
   providerSource: providerMode === 'WISESHEETS' ? 'WISESHEETS_DATA_API' :
     fiscalFixtureDirectory ? 'FISCAL_AI_MCP_LOCAL_CAPTURE' : 'FISCAL_AI_DATA_API',
-  tickers: requestedTickers, years, metrics, changedOnly, companyResults, fiscalAiDiscrepancies, summary: { totalCompanies: companyResults.length, totalHistoricalNumbers: filteredRecords.length, ...counts, unresolvedCellCount: auditIssueCells.size, acceptedNaCellsWithEvidence, fiscalAiDiscrepancyCount: fiscalAiDiscrepancies.length, failuresByRootCause, economicSanityFlagCount: sanityFlags.length, auditIssueCount: auditIssues.length }, sanityFlags, auditIssues, records: filteredRecords }
+  tickers: requestedTickers, years, metrics, changedOnly, companyResults, fiscalAiDiscrepancies, summary: { totalCompanies: companyResults.length, totalHistoricalNumbers: filteredRecords.length, ...counts, unresolvedCellCount: auditIssueCells.size, acceptedNaCellsWithEvidence, reportedFiscalYearCells: reportedFiscalYears.length, verifiedReportedFiscalYearCells: fiscalVerified.length, additionalUsableReportedFiscalYearCells: additionalUsableFiscalCells.length, fiscalAiDiscrepancyCount: fiscalAiDiscrepancies.length, failuresByRootCause, economicSanityFlagCount: sanityFlags.length, auditIssueCount: auditIssues.length }, sanityFlags, auditIssues, records: filteredRecords, reportedFiscalYears, additionalUsableFiscalCells }
 
 await mkdir(outputDirectory, { recursive: true })
 const perTickerDirectory = path.join(outputDirectory, 'by-ticker')

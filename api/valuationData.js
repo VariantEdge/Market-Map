@@ -30,6 +30,7 @@ import {
   compareFiscalAdjustedEbitda, fetchFiscalAiHistorical, fiscalAdjustedEbitdaCandidates,
 } from '../server/valuation/fiscalAiFinancials.js'
 import { buildCanonicalHistoricalFinancials } from '../server/valuation/secCanonicalFinancials.js'
+import { buildReportedFiscalYears } from '../server/valuation/reportedFiscalYears.js'
 import { createPerTickerCache, runAbortableTask, runBoundedTask } from '../server/valuation/interactiveCache.js'
 import {
   evaluateFinancialSnapshotPromotion,
@@ -867,6 +868,10 @@ export async function buildValuationRow(supabase, ticker, years, providerData = 
   const ranges = quoteRanges(chart, quote?.price)
   const row = {
     ticker,
+    reportedFiscalYears: canonical ? buildReportedFiscalYears({
+      ticker, canonical, adjustedEbitda: historicalLedger?.adjustedEbitda,
+      years: years.actual,
+    }) : [],
     name: company?.name ?? ticker,
     cik: company?.cik ?? null,
     issuerClassification,
